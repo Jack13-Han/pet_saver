@@ -248,7 +248,7 @@ export default function Dashboard() {
   const handleQuickSave = async () => {
     setShowSaveModal(true);
     setSaveAmount("");
-    setTransactionType("withdrawal");
+    setTransactionType("deposit");
     setTransactionCategory("General");
   };
 
@@ -752,16 +752,8 @@ export default function Dashboard() {
                       </select>
                     </div>
 
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      ref={fileInputRef}
-                      style={{ display: "none" }}
-                      onChange={handleReceiptUpload}
-                    />
                     <div
-                      className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-4 text-sm font-semibold text-slate-500 cursor-pointer hover:bg-slate-50 transition"
+                      className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-4 text-sm font-semibold text-slate-500"
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -773,18 +765,9 @@ export default function Dashboard() {
                         fontWeight: 600,
                         color: "#6b7280",
                       }}
-                      onClick={() => !isScanning && fileInputRef.current?.click()}
                     >
-                      <span>
-                        {isScanning
-                          ? "Scanning receipt..."
-                          : transactionNote || "Scan Receipt (Auto-fill)"}
-                      </span>
-                      {isScanning ? (
-                        <ScanLine size={16} className="text-emerald-500 animate-pulse" />
-                      ) : (
-                        <Camera size={16} className="text-slate-400" />
-                      )}
+                      <span>Description</span>
+                      <Camera size={16} className="text-slate-400" />
                     </div>
 
                     <div

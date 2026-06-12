@@ -8,6 +8,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // ⚠️ ခင်ဗျားရဲ့ လက်ရှိ API Key
 
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
 // ဖိုင်ကို Gemini ဖတ်နိုင်တဲ့ Base64 format ပြောင်းပေးမယ့် helper function
 const fileToGenerativePart = async (file) => {
@@ -28,7 +29,7 @@ const fileToGenerativePart = async (file) => {
 // 503 (High Demand) Error အတွက် ခေတ္တ စောင့်ဆိုင်းပေးမယ့် Helper function
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-const realOCR = async (file) => {
+export const realOCR = async (file) => {
   const today = new Date().toISOString().split('T')[0];
   const imagePart = await fileToGenerativePart(file);
 

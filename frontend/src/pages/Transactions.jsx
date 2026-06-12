@@ -39,7 +39,7 @@ export default function Transactions() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="card" style={{ borderLeft: '4px solid var(--accent-green)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
             <ArrowUpCircle size={24} color="var(--accent-green)" />
