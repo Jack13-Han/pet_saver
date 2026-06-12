@@ -173,10 +173,10 @@ if ($path === 'dashboard' && $method === 'GET') {
     SELECT t.*, a.happiness, a.energy, a.fullness,
         a.cleanliness, a.level, a.exp,
         a.mood, a.accessories
-    FROM users u
-    JOIN targets t ON u.active_target_id = t.id
+    FROM targets t
     LEFT JOIN avatars a ON t.id = a.target_id
-    WHERE u.id = ?
+    WHERE t.user_id = ? AND t.status = 'active'
+    ORDER BY t.created_at DESC LIMIT 1
     ");
     $stmt->execute([$userId]);
     $activeTarget = $stmt->fetch();
@@ -217,6 +217,13 @@ if ($path === 'targets' && $method === 'POST') {
     $name = trim($input['name'] ?? '');
     $targetAmount = floatval($input['target_amount'] ?? 0);
     if (empty($name) || $targetAmount <= 0) errorResponse('Name and target amount required');
+
+    // Check if user already has an active goal
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM targets WHERE user_id = ? AND status = 'active'");
+    $stmt->execute([$userId]);
+    if ($stmt->fetchColumn() > 0) {
+        errorResponse('You can only have one active goal at a time. Please complete or delete your current goal first.', 400);
+    }
 
     $pdo->beginTransaction();
 

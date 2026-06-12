@@ -11,6 +11,7 @@ import {
   RotateCw,
   Camera,
   ScanLine,
+  Calendar,
 } from "lucide-react";
 import {
   dashboard as dashboardApi,
@@ -18,9 +19,11 @@ import {
   avatars as avatarApi,
   user as userApi,
   targets as targetApi,
+  calendar as calendarApi,
 } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { realOCR } from "./ReceiptScanner.jsx";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 import catIdle from "../assets/pets/cat_idle.png";
 import catHappy from "../assets/pets/cat_happy.png";
@@ -53,6 +56,7 @@ const careActions = [
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
+  const [calendarData, setCalendarData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [animatingPet, setAnimatingPet] = useState(false);
@@ -63,8 +67,6 @@ export default function Dashboard() {
   const [transactionNote, setTransactionNote] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const fileInputRef = useRef(null);
-  const [goals, setGoals] = useState([]);
-  const [selectedGoal, setSelectedGoal] = useState("");
   const { updateUser } = useAuth();
   const navigate = useNavigate();
 
@@ -153,16 +155,19 @@ export default function Dashboard() {
 
   const loadDashboard = async () => {
     try {
-      const [dashboardRes, goalsRes] = await Promise.all([
+      const [dashboardRes, calendarRes] = await Promise.all([
         dashboardApi.get(),
-        targetApi.list("active"),
+        calendarApi.get(),
       ]);
 
       setData(dashboardRes.data);
-      setGoals(goalsRes.data || []);
-
-      if (dashboardRes.data?.activeTarget) {
-        setSelectedGoal(dashboardRes.data.activeTarget.id);
+      
+      if (calendarRes.data) {
+        const formattedData = calendarRes.data.map(item => ({
+          date: new Date(item.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          amount: parseFloat(item.total)
+        }));
+        setCalendarData(formattedData);
       }
 
       setLoading(false);
@@ -728,17 +733,11 @@ export default function Dashboard() {
                         Category
                       </label>
                       <select
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-emerald-500 focus:bg-white"
+                        className="form-input"
                         style={{
                           width: "100%",
                           borderRadius: 16,
-                          border: "1px solid #e5e7eb",
                           background: "#f8fafc",
-                          padding: "12px 16px",
-                          fontSize: 14,
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          outline: "none",
                         }}
                         value={transactionCategory}
                         onChange={(e) => setTransactionCategory(e.target.value)}
@@ -834,6 +833,34 @@ export default function Dashboard() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* DAILY SPENDING CHART */}
+          {calendarData.length > 0 && (
+            <motion.div
+              className="card"
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.25 }}
+            >
+              <div className="card-header">
+                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Calendar size={20} color="#EF4444" />
+                  Daily Spending
+                </h3>
+              </div>
+              <div style={{ height: 250, width: '100%', marginTop: 16 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={calendarData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} />
+                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} tickFormatter={(value) => `¥${value}`} />
+                    <Tooltip cursor={{fill: '#f3f4f6'}} formatter={(value) => `¥${value.toLocaleString()}`} />
+                    <Bar dataKey="amount" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </motion.div>
+          )}
 
           {/* CARE ACTIONS */}
           {target && (
@@ -937,21 +964,6 @@ export default function Dashboard() {
                 </button>
               </div>
 
-              <select
-                value={selectedGoal}
-                onChange={(e) => changeGoal(e.target.value)}
-                className="amount-input"
-                style={{
-                  marginBottom: "12px",
-                  width: "100%",
-                }}
-              >
-                {goals.map((goal) => (
-                  <option key={goal.id} value={goal.id}>
-                    {goal.name}
-                  </option>
-                ))}
-              </select>
               <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
                 <div className="goal-image">🎮</div>
                 <div className="goal-info">

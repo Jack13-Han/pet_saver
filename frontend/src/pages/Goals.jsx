@@ -55,9 +55,15 @@ export default function Goals() {
           <h2>My Goals 🎯</h2>
           <p>Set targets and watch your pet grow!</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={18} /> New Goal
-        </button>
+        {goals.length === 0 ? (
+          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <Plus size={18} /> New Goal
+          </button>
+        ) : (
+          <div style={{ background: 'var(--accent-orange-light)', color: 'var(--accent-orange)', padding: '8px 16px', borderRadius: 'var(--radius-md)', fontSize: '14px', fontWeight: 'bold' }}>
+            Complete current goal first!
+          </div>
+        )}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
