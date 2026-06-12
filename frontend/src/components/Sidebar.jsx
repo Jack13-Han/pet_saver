@@ -1,7 +1,7 @@
 import React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
-import { Home, Target, Receipt, ShoppingBag, Trophy, Camera, Medal, Settings, LogOut, Flame } from 'lucide-react'
+import { Home, Target, Receipt, ShoppingBag, Trophy, Camera, Medal, Settings, LogOut, Flame, X } from 'lucide-react'
 
 const navItems = [
   { path: '/', icon: Home, label: 'Home' },
@@ -14,13 +14,20 @@ const navItems = [
   { path: '/settings', icon: Settings, label: 'Settings' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+      <button 
+        className="lg:hidden absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100"
+        onClick={onClose}
+      >
+        <X size={20} />
+      </button>
+
       <div className="sidebar-brand">
         <div className="brand-icon">🐾</div>
         <div className="brand-text">
@@ -34,7 +41,10 @@ export default function Sidebar() {
           <button
             key={item.path}
             className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
-            onClick={() => navigate(item.path)}
+            onClick={() => {
+              navigate(item.path)
+              if (onClose) onClose()
+            }}
           >
             <item.icon size={20} />
             <span>{item.label}</span>
@@ -61,7 +71,7 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <div className="motivation-box">
+        <div className="motivation-box hidden sm:flex">
           <span>🌱</span>
           <p>Keep saving to help your pet grow!</p>
         </div>
