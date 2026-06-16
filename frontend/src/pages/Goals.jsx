@@ -116,56 +116,149 @@ export default function Goals() {
       {/* CREATE MODAL */}
       <AnimatePresence>
         {showModal && (
-          <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)}>
-            <motion.div className="modal-content" initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} onClick={e => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3 className="modal-title">Create New Goal</h3>
-                <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 sm:p-0" onClick={() => setShowModal(false)}>
+            <motion.div 
+              className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] border border-orange-100"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95, y: 20 }} 
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-br from-orange-400 to-orange-500 p-6 flex justify-between items-center text-white shrink-0 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                <div className="relative z-10">
+                  <h3 className="text-2xl font-black mb-1 flex items-center gap-2 tracking-tight">
+                    <Target className="w-7 h-7" /> Create New Goal
+                  </h3>
+                  <p className="text-orange-100 text-sm font-medium">Set a target and watch your pet grow!</p>
+                </div>
+                <button 
+                  className="relative z-10 bg-white/20 hover:bg-white/30 text-white rounded-full p-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-white" 
+                  onClick={() => setShowModal(false)}
+                >
+                  <Plus className="w-5 h-5 rotate-45" />
+                </button>
               </div>
-              <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div className="form-group">
-                  <label>Goal Name</label>
-                  <input className="form-input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. New Nintendo Switch" required />
-                </div>
-                <div className="form-group">
-                  <label>Target Amount (¥)</label>
-                  <input className="form-input" type="number" value={form.target_amount} onChange={e => setForm({...form, target_amount: e.target.value})} placeholder="35000" required />
-                </div>
-                <div className="form-group">
-                  <label>Category</label>
-                  <select className="form-input" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
-                    <option>General</option><option>Education</option><option>Electronics</option><option>Travel</option><option>Emergency</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Deadline (Optional)</label>
-                  <input className="form-input" type="date" value={form.deadline} onChange={e => setForm({...form, deadline: e.target.value})} />
-                </div>
-                <div className="form-group">
-                  <label>Choose Avatar</label>
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    {avatarTypes.map(type => (
-                      <button key={type.id} type="button" onClick={() => setForm({...form, avatar_type: type.id})}
-                        style={{
-                          padding: 12, borderRadius: 'var(--radius-md)',
-                          border: form.avatar_type === type.id ? '3px solid var(--accent-green)' : '2px solid var(--border-color)',
-                          background: form.avatar_type === type.id ? 'var(--accent-green-light)' : 'white',
-                          cursor: 'pointer', fontSize: 28, transition: 'all 0.2s'
-                        }}>
-                        {type.emoji}
-                        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>{type.name}</div>
-                      </button>
-                    ))}
+
+              {/* Form Body */}
+              <div className="overflow-y-auto flex-1 p-6 sm:p-8 custom-scrollbar">
+                <form id="createGoalForm" onSubmit={handleCreate} className="space-y-8">
+                  
+                  {/* Goal Basics */}
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">What are you saving for? ✨</label>
+                      <input 
+                        className="w-full px-5 py-3.5 rounded-2xl border-2 border-orange-100 bg-orange-50/30 focus:bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-400/20 transition-all outline-none text-gray-800 font-bold placeholder:font-normal placeholder:text-gray-400" 
+                        value={form.name} 
+                        onChange={e => setForm({...form, name: e.target.value})} 
+                        placeholder="e.g. New Nintendo Switch" 
+                        required 
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Target Amount 💰</label>
+                        <div className="relative">
+                          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-orange-500 font-black text-lg">¥</span>
+                          <input 
+                            className="w-full pl-10 pr-5 py-3.5 rounded-2xl border-2 border-orange-100 bg-orange-50/30 focus:bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-400/20 transition-all outline-none text-gray-800 font-black text-lg" 
+                            type="number" 
+                            value={form.target_amount} 
+                            onChange={e => setForm({...form, target_amount: e.target.value})} 
+                            placeholder="35000" 
+                            min="1"
+                            required 
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">Category 📁</label>
+                        <select 
+                          className="w-full px-5 py-3.5 rounded-2xl border-2 border-orange-100 bg-orange-50/30 focus:bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-400/20 transition-all outline-none text-gray-800 font-bold appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23fb923c%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1.2rem_center] bg-[length:0.8rem_auto]" 
+                          value={form.category} 
+                          onChange={e => setForm({...form, category: e.target.value})}
+                        >
+                          <option>General</option><option>Education</option><option>Electronics</option><option>Travel</option><option>Emergency</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Deadline ⏰ (Optional)</label>
+                      <input 
+                        className="w-full px-5 py-3.5 rounded-2xl border-2 border-orange-100 bg-orange-50/30 focus:bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-400/20 transition-all outline-none text-gray-800 font-bold" 
+                        type="date" 
+                        value={form.deadline} 
+                        onChange={e => setForm({...form, deadline: e.target.value})} 
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="form-group">
-                  <label>Avatar Name</label>
-                  <input className="form-input" value={form.avatar_name} onChange={e => setForm({...form, avatar_name: e.target.value})} placeholder="Mochi" />
-                </div>
-                <button type="submit" className="btn btn-primary" style={{ marginTop: 8 }}>Create Goal</button>
-              </form>
+
+                  <hr className="border-gray-100" />
+
+                  {/* Pet Selection */}
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-3">Choose Your Companion 🐾</label>
+                      <div className="grid grid-cols-5 gap-3">
+                        {avatarTypes.map(type => (
+                          <button 
+                            key={type.id} 
+                            type="button" 
+                            onClick={() => setForm({...form, avatar_type: type.id})}
+                            className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all duration-300 ${
+                              form.avatar_type === type.id 
+                                ? 'border-orange-400 bg-orange-50 shadow-md scale-105' 
+                                : 'border-gray-100 bg-white hover:border-orange-200 hover:bg-orange-50/50'
+                            }`}
+                          >
+                            <span className="text-3xl mb-1 filter drop-shadow-sm">{type.emoji}</span>
+                            <span className={`text-xs font-bold ${form.avatar_type === type.id ? 'text-orange-600' : 'text-gray-500'}`}>
+                              {type.name}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">Pet's Name 🏷️</label>
+                      <input 
+                        className="w-full px-5 py-3.5 rounded-2xl border-2 border-orange-100 bg-orange-50/30 focus:bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-400/20 transition-all outline-none text-gray-800 font-bold placeholder:font-normal placeholder:text-gray-400" 
+                        value={form.avatar_name} 
+                        onChange={e => setForm({...form, avatar_name: e.target.value})} 
+                        placeholder="e.g. Mochi" 
+                      />
+                    </div>
+                  </div>
+
+                </form>
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-gray-100 bg-gray-50/80 shrink-0 flex justify-end gap-3 rounded-b-[2rem]">
+                <button 
+                  type="button" 
+                  className="px-6 py-3.5 rounded-xl font-bold text-gray-600 bg-white border-2 border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                  onClick={() => setShowModal(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  form="createGoalForm"
+                  className="px-8 py-3.5 rounded-xl font-black text-white bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all active:scale-95"
+                >
+                  Create Goal ✨
+                </button>
+              </div>
+
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>
