@@ -116,9 +116,9 @@ export default function Goals() {
       {/* CREATE MODAL */}
       <AnimatePresence>
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 sm:p-0" onClick={() => setShowModal(false)}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-sm p-4 sm:p-0" onClick={() => setShowModal(false)}>
             <motion.div 
-              className="bg-white rounded-[2rem] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] border border-orange-100"
+              className="bg-white rounded-[28px] shadow-[0_28px_70px_rgba(15,23,42,0.18)] w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] border border-slate-200"
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
               animate={{ opacity: 1, scale: 1, y: 0 }} 
               exit={{ opacity: 0, scale: 0.95, y: 20 }} 
@@ -126,16 +126,15 @@ export default function Goals() {
               onClick={e => e.stopPropagation()}
             >
               {/* Header */}
-              <div className="bg-gradient-to-br from-orange-400 to-orange-500 p-6 flex justify-between items-center text-white shrink-0 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
-                <div className="relative z-10">
-                  <h3 className="text-2xl font-black mb-1 flex items-center gap-2 tracking-tight">
-                    <Target className="w-7 h-7" /> Create New Goal
+              <div className="border-b border-slate-200 p-6 flex justify-between items-center bg-white shrink-0 relative overflow-hidden">
+                <div className="relative z-10 flex-1 text-center">
+                  <h3 className="text-xl font-extrabold tracking-tight text-slate-900 mb-1 flex items-center justify-center gap-2">
+                    <Target className="w-6 h-6 text-emerald-500" /> Create New Goal
                   </h3>
-                  <p className="text-orange-100 text-sm font-medium">Set a target and watch your pet grow!</p>
+                  <p className="text-slate-500 text-sm font-medium">Set a target and watch your pet grow!</p>
                 </div>
                 <button 
-                  className="relative z-10 bg-white/20 hover:bg-white/30 text-white rounded-full p-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-white" 
+                  className="absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 focus:outline-none" 
                   onClick={() => setShowModal(false)}
                 >
                   <Plus className="w-5 h-5 rotate-45" />
@@ -144,14 +143,14 @@ export default function Goals() {
 
               {/* Form Body */}
               <div className="overflow-y-auto flex-1 p-6 sm:p-8 custom-scrollbar">
-                <form id="createGoalForm" onSubmit={handleCreate} className="space-y-8">
+                <form id="createGoalForm" onSubmit={handleCreate} className="space-y-6">
                   
                   {/* Goal Basics */}
                   <div className="space-y-5">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">What are you saving for? ✨</label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-500 block">What are you saving for? ✨</label>
                       <input 
-                        className="w-full px-5 py-3.5 rounded-2xl border-2 border-orange-100 bg-orange-50/30 focus:bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-400/20 transition-all outline-none text-gray-800 font-bold placeholder:font-normal placeholder:text-gray-400" 
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all outline-none text-slate-900 font-bold placeholder:font-normal placeholder:text-slate-400" 
                         value={form.name} 
                         onChange={e => setForm({...form, name: e.target.value})} 
                         placeholder="e.g. New Nintendo Switch" 
@@ -160,12 +159,12 @@ export default function Goals() {
                     </div>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Target Amount 💰</label>
-                        <div className="relative">
-                          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-orange-500 font-black text-lg">¥</span>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-500 block">Target Amount 💰</label>
+                        <div className="relative flex items-center border-b-2 border-emerald-500 pb-2">
+                          <span className="text-xl font-bold text-slate-400 mr-2">¥</span>
                           <input 
-                            className="w-full pl-10 pr-5 py-3.5 rounded-2xl border-2 border-orange-100 bg-orange-50/30 focus:bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-400/20 transition-all outline-none text-gray-800 font-black text-lg" 
+                            className="w-full border-0 bg-transparent text-xl font-bold text-slate-900 outline-none placeholder:text-slate-400" 
                             type="number" 
                             value={form.target_amount} 
                             onChange={e => setForm({...form, target_amount: e.target.value})} 
@@ -175,10 +174,10 @@ export default function Goals() {
                           />
                         </div>
                       </div>
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">Category 📁</label>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-500 block">Category 📁</label>
                         <select 
-                          className="w-full px-5 py-3.5 rounded-2xl border-2 border-orange-100 bg-orange-50/30 focus:bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-400/20 transition-all outline-none text-gray-800 font-bold appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23fb923c%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1.2rem_center] bg-[length:0.8rem_auto]" 
+                          className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all outline-none text-slate-900 font-bold appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2310b981%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:0.8rem_auto]" 
                           value={form.category} 
                           onChange={e => setForm({...form, category: e.target.value})}
                         >
@@ -187,10 +186,10 @@ export default function Goals() {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">Deadline ⏰ (Optional)</label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-500 block">Deadline ⏰ (Optional)</label>
                       <input 
-                        className="w-full px-5 py-3.5 rounded-2xl border-2 border-orange-100 bg-orange-50/30 focus:bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-400/20 transition-all outline-none text-gray-800 font-bold" 
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all outline-none text-slate-900 font-bold" 
                         type="date" 
                         value={form.deadline} 
                         onChange={e => setForm({...form, deadline: e.target.value})} 
@@ -198,26 +197,26 @@ export default function Goals() {
                     </div>
                   </div>
 
-                  <hr className="border-gray-100" />
+                  <hr className="border-slate-100" />
 
                   {/* Pet Selection */}
                   <div className="space-y-5">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-3">Choose Your Companion 🐾</label>
+                    <div className="space-y-3">
+                      <label className="text-sm font-bold text-slate-500 block">Choose Your Companion 🐾</label>
                       <div className="grid grid-cols-5 gap-3">
                         {avatarTypes.map(type => (
                           <button 
                             key={type.id} 
                             type="button" 
                             onClick={() => setForm({...form, avatar_type: type.id})}
-                            className={`flex flex-col items-center justify-center p-3 rounded-2xl border-2 transition-all duration-300 ${
+                            className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-300 ${
                               form.avatar_type === type.id 
-                                ? 'border-orange-400 bg-orange-50 shadow-md scale-105' 
-                                : 'border-gray-100 bg-white hover:border-orange-200 hover:bg-orange-50/50'
+                                ? 'border-emerald-500 bg-emerald-50 shadow-sm scale-105' 
+                                : 'border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50'
                             }`}
                           >
                             <span className="text-3xl mb-1 filter drop-shadow-sm">{type.emoji}</span>
-                            <span className={`text-xs font-bold ${form.avatar_type === type.id ? 'text-orange-600' : 'text-gray-500'}`}>
+                            <span className={`text-xs font-bold ${form.avatar_type === type.id ? 'text-emerald-700' : 'text-slate-500'}`}>
                               {type.name}
                             </span>
                           </button>
@@ -225,10 +224,10 @@ export default function Goals() {
                       </div>
                     </div>
                     
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">Pet's Name 🏷️</label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-500 block">Pet's Name 🏷️</label>
                       <input 
-                        className="w-full px-5 py-3.5 rounded-2xl border-2 border-orange-100 bg-orange-50/30 focus:bg-white focus:border-orange-400 focus:ring-4 focus:ring-orange-400/20 transition-all outline-none text-gray-800 font-bold placeholder:font-normal placeholder:text-gray-400" 
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all outline-none text-slate-900 font-bold placeholder:font-normal placeholder:text-slate-400" 
                         value={form.avatar_name} 
                         onChange={e => setForm({...form, avatar_name: e.target.value})} 
                         placeholder="e.g. Mochi" 
@@ -240,10 +239,10 @@ export default function Goals() {
               </div>
 
               {/* Footer */}
-              <div className="p-6 border-t border-gray-100 bg-gray-50/80 shrink-0 flex justify-end gap-3 rounded-b-[2rem]">
+              <div className="p-6 border-t border-slate-200 bg-slate-50 shrink-0 flex justify-end gap-3 rounded-b-[28px]">
                 <button 
                   type="button" 
-                  className="px-6 py-3.5 rounded-xl font-bold text-gray-600 bg-white border-2 border-gray-200 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                  className="px-6 py-3.5 rounded-2xl font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors"
                   onClick={() => setShowModal(false)}
                 >
                   Cancel
@@ -251,7 +250,7 @@ export default function Goals() {
                 <button 
                   type="submit" 
                   form="createGoalForm"
-                  className="px-8 py-3.5 rounded-xl font-black text-white bg-gradient-to-r from-orange-400 to-orange-500 hover:from-orange-500 hover:to-orange-600 shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all active:scale-95"
+                  className="px-8 py-3.5 rounded-2xl font-bold text-white bg-emerald-500 hover:bg-emerald-600 shadow-[0_8px_16px_rgba(74,222,128,0.25)] transition-all active:scale-95"
                 >
                   Create Goal ✨
                 </button>

@@ -203,8 +203,13 @@ if ($path === 'dashboard' && $method === 'GET') {
 
 if ($path === 'targets' && $method === 'GET') {
     $status = $_GET['status'] ?? 'active';
-    $stmt = $pdo->prepare("SELECT t.*, a.happiness, a.energy, a.fullness, a.cleanliness, a.level, a.mood FROM targets t LEFT JOIN avatars a ON t.id = a.target_id WHERE t.user_id = ? AND t.status = ? ORDER BY t.created_at DESC");
-    $stmt->execute([$userId, $status]);
+    if ($status === 'all') {
+        $stmt = $pdo->prepare("SELECT t.*, a.happiness, a.energy, a.fullness, a.cleanliness, a.level, a.mood FROM targets t LEFT JOIN avatars a ON t.id = a.target_id WHERE t.user_id = ? ORDER BY t.created_at DESC");
+        $stmt->execute([$userId]);
+    } else {
+        $stmt = $pdo->prepare("SELECT t.*, a.happiness, a.energy, a.fullness, a.cleanliness, a.level, a.mood FROM targets t LEFT JOIN avatars a ON t.id = a.target_id WHERE t.user_id = ? AND t.status = ? ORDER BY t.created_at DESC");
+        $stmt->execute([$userId, $status]);
+    }
     $targets = $stmt->fetchAll();
     foreach ($targets as &$t) {
         $t['progress'] = $t['target_amount'] > 0 ? round(($t['current_amount'] / $t['target_amount']) * 100, 1) : 0;
