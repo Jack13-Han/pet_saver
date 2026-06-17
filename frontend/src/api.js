@@ -96,6 +96,7 @@ export const targets = {
 export const transactions = {
   list: () => api("transactions"),
   create: (data) => api("transactions", { method: "POST", body: data }),
+  getInsights: () => api("transactions/insights"),
 };
 
 //calendar

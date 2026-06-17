@@ -3,14 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Upload, ScanLine, Check, X, Sparkles, FileText, Store, DollarSign, Calendar, Tag } from 'lucide-react'
 import { receipts as receiptApi, targets as targetApi } from '../api.js'
 
-// 1. Google Generative AI ကို Import လုပ်မယ်
+// 1. Import Google Generative AI SDK
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-// ⚠️ ခင်ဗျားရဲ့ လက်ရှိ API Key
-
+// ⚠️ API Key configuration using Vite environment variables
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
-// ဖိုင်ကို Gemini ဖတ်နိုင်တဲ့ Base64 format ပြောင်းပေးမယ့် helper function
+// Helper function to convert file to Base64 format readable by Gemini
 const fileToGenerativePart = async (file) => {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -26,20 +25,20 @@ const fileToGenerativePart = async (file) => {
   });
 };
 
-// 503 (High Demand) Error အတွက် ခေတ္တ စောင့်ဆိုင်းပေးမယ့် Helper function
+// Helper function to delay execution (useful for handling rate limits/high demand)
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const realOCR = async (file) => {
   const today = new Date().toISOString().split('T')[0];
   const imagePart = await fileToGenerativePart(file);
 
-  // စာဖတ်နှုန်း အရည်အသွေး ကောင်းမွန်စေရန် Model အသစ်နှင့် Schema သတ်မှတ်ချက်ကို သုံးထားပါတယ်
+  // Use Gemini API to parse the receipt image and extract structured data
   const model = genAI.getGenerativeModel({ 
     model: "gemini-2.5-flash",
     systemInstruction: "You are a professional financial auditor and highly accurate receipt parser. Analyze the provided image meticulously to extract information even if the image is slightly blurry or at an angle.",
     generationConfig: { 
       responseMimeType: "application/json",
-      // Output Format တိကျပြီး Error မတက်စေရန် Schema ပိတ်ထားခြင်း
+      // Enforce strict response schema for reliable parsing
       responseSchema: {
         type: "object",
         properties: {
@@ -61,7 +60,7 @@ export const realOCR = async (file) => {
     Ensure extreme accuracy for numbers and characters.
   `;
 
-  // Server overloaded ဖြစ်ရင် ၃ ကြိမ်အထိ အလိုအလျောက် ပြန်ကြိုးစားမည့် စနစ် (Exponential Backoff Retry)
+  // Exponential Backoff Retry mechanism (up to 3 attempts) if server is overloaded
   let maxRetries = 3;
   let attempt = 0;
 
@@ -84,13 +83,13 @@ export const realOCR = async (file) => {
       attempt++;
       console.warn(`Attempt ${attempt} failed. Error: ${err.message}`);
       
-      // အကယ်၍ 503 Overloaded Error ဖြစ်ခဲ့လျှင် ခေတ္တ စောင့်ပြီး ပြန်ကြိုးစားမည်
+      // If a 503 Overloaded Error or high demand occurs, wait briefly and retry
       if ((err.message?.includes('503') || err.message?.includes('demand')) && attempt < maxRetries) {
         await delay(attempt * 2000); // 1st try: 2s, 2nd try: 4s
         continue;
       }
 
-      // တကယ်လို့ retry လုပ်လို့မှ မရတော့ရင် အောက်က default တန်ဖိုးကို ပြန်ပေးမယ်
+      // If retries are exhausted, fallback to default parsing values
       console.error("Gemini Image Parsing Final Error:", err);
       alert("AI parsing is temporarily unavailable due to high server traffic. Please try again in a few moments.");
       

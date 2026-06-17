@@ -16,7 +16,7 @@ if (in_array($origin, $allowedOrigins, true)) {
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 
-// ၂။ Browser ရဲ့ ရှေ့ပြေး စစ်ဆေးမှု (Preflight Options Check) ကို အောင်မြင်ကြောင်း ပြန်ပြောရန်
+// 2. Handle preflight OPTIONS request for CORS
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header("HTTP/1.1 200 OK");
     exit();
@@ -126,7 +126,7 @@ if ($userId) {
 }
 
 if ($path === 'user' && $method === 'GET') {
-    $stmt = $pdo->prepare("SELECT id, username, email, coins, rank, streak_days, total_saved, total_targets_completed FROM users WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT id, username, email, coins, `rank`, streak_days, total_saved, total_targets_completed FROM users WHERE id = ?");
     $stmt->execute([$userId]);
     successResponse($stmt->fetch());
 }
@@ -307,8 +307,20 @@ if ($path === 'transactions' && $method === 'POST') {
     $target = $stmt->fetch();
     if (!$target) errorResponse('Target not found');
 
-    $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, ?, ?, ?)")
-        ->execute([$targetId, $userId, $amount, $type, $input['note'] ?? '', $input['date'] ?? date('Y-m-d')]);
+    // Extract category if explicitly passed, else try to parse from note, or fallback to General
+    $category = trim($input['category'] ?? '');
+    if (empty($category) && !empty($input['note'])) {
+        if (strpos($input['note'], ' · ') !== false) {
+            $parts = explode(' · ', $input['note']);
+            $category = trim($parts[0]);
+        }
+    }
+    if (empty($category)) {
+        $category = 'General';
+    }
+
+    $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, category, note, transaction_date) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        ->execute([$targetId, $userId, $amount, $type, $category, $input['note'] ?? '', $input['date'] ?? date('Y-m-d')]);
 
     if ($type === 'deposit') {
         $newAmount = $target['current_amount'] + $amount;
@@ -347,6 +359,54 @@ if ($path === 'transactions' && $method === 'GET') {
     $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 50");
     $stmt->execute([$userId]);
     successResponse($stmt->fetchAll());
+}
+
+if ($path === 'transactions/insights' && $method === 'GET') {
+    // 1. Get total spending (withdrawals) grouped by category
+    $stmt = $pdo->prepare("
+        SELECT category, SUM(amount) as total
+        FROM transactions
+        WHERE user_id = ? AND type = 'withdrawal'
+        GROUP BY category
+        ORDER BY total DESC
+    ");
+    $stmt->execute([$userId]);
+    $categories = $stmt->fetchAll();
+
+    // 2. Get total savings (deposits) vs total spending (withdrawals)
+    $stmt = $pdo->prepare("
+        SELECT 
+            SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END) as total_savings,
+            SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END) as total_spending
+        FROM transactions
+        WHERE user_id = ?
+    ");
+    $stmt->execute([$userId]);
+    $totals = $stmt->fetch();
+
+    // 3. Get recent 6 months spending history by month for monthly comparison
+    $stmt = $pdo->prepare("
+        SELECT 
+            DATE_FORMAT(transaction_date, '%Y-%m') as raw_month,
+            DATE_FORMAT(transaction_date, '%b %Y') as month_year,
+            SUM(amount) as total
+        FROM transactions
+        WHERE user_id = ? AND type = 'withdrawal'
+        GROUP BY raw_month, month_year
+        ORDER BY raw_month ASC
+        LIMIT 6
+    ");
+    $stmt->execute([$userId]);
+    $monthlyTrend = $stmt->fetchAll();
+
+    successResponse([
+        'categories' => $categories,
+        'totals' => [
+            'savings' => floatval($totals['total_savings'] ?? 0),
+            'spending' => floatval($totals['total_spending'] ?? 0),
+        ],
+        'monthlyTrend' => $monthlyTrend
+    ]);
 }
 
 //calendar
@@ -469,8 +529,9 @@ if ($path === 'receipts' && $method === 'POST') {
     $receiptId = $pdo->lastInsertId();
 
     if ($targetId && $totalPrice > 0) {
-        $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, 'deposit', ?, ?)")
-            ->execute([$targetId, $userId, $totalPrice, "Receipt: " . ($input['shop_name'] ?? ''), $input['date'] ?? date('Y-m-d')]);
+        $receiptCategory = trim($input['category'] ?? 'Shopping');
+        $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, category, note, transaction_date) VALUES (?, ?, ?, 'deposit', ?, ?, ?)")
+            ->execute([$targetId, $userId, $totalPrice, $receiptCategory, "Receipt: " . ($input['shop_name'] ?? ''), $input['date'] ?? date('Y-m-d')]);
         $stmt = $pdo->prepare("SELECT * FROM targets WHERE id = ?");
         $stmt->execute([$targetId]);
         $target = $stmt->fetch();
@@ -495,7 +556,7 @@ if ($path === 'receipts' && $method === 'GET') {
 }
 
 if ($path === 'rankings' && $method === 'GET') {
-    $stmt = $pdo->query("SELECT id, username, rank, total_targets_completed, total_saved, coins, CASE WHEN rank = 'Platinum' THEN 5 WHEN rank = 'Diamond' THEN 4 WHEN rank = 'Gold' THEN 3 WHEN rank = 'Silver' THEN 2 ELSE 1 END as rank_value FROM users ORDER BY rank_value DESC, total_targets_completed DESC, total_saved DESC LIMIT 50");
+    $stmt = $pdo->query("SELECT id, username, `rank`, total_targets_completed, total_saved, coins, CASE WHEN `rank` = 'Platinum' THEN 5 WHEN `rank` = 'Diamond' THEN 4 WHEN `rank` = 'Gold' THEN 3 WHEN `rank` = 'Silver' THEN 2 ELSE 1 END as rank_value FROM users ORDER BY rank_value DESC, total_targets_completed DESC, total_saved DESC LIMIT 50");
     successResponse($stmt->fetchAll());
 }
 
@@ -612,7 +673,7 @@ function updateRank($pdo, $userId)
     elseif ($completed >= 10) $rank = 'Diamond';
     elseif ($completed >= 5) $rank = 'Gold';
     elseif ($completed >= 1) $rank = 'Silver';
-    $pdo->prepare("UPDATE users SET rank = ? WHERE id = ? AND rank != ?")->execute([$rank, $userId, $rank]);
+    $pdo->prepare("UPDATE users SET `rank` = ? WHERE id = ? AND `rank` != ?")->execute([$rank, $userId, $rank]);
 }
 
 errorResponse(
