@@ -1,7 +1,5 @@
 -- Pet Saver Database Schema
 -- Run: mysql -u root -p < schema.sql
-CREATE DATABASE IF NOT EXISTS pet_saver CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE pet_saver;
 
 CREATE TABLE
     users (
