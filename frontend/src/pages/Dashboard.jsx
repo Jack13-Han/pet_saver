@@ -67,7 +67,7 @@ export default function Dashboard() {
   const [transactionNote, setTransactionNote] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const fileInputRef = useRef(null);
-  const { updateUser } = useAuth();
+  const { user, updateUser } = useAuth();
   const navigate = useNavigate();
 
   const handleReceiptUpload = async (e) => {
@@ -224,7 +224,7 @@ export default function Dashboard() {
 
       if (res.data.status === "completed") {
         showToast("🎉 Goal completed! You earned coins!");
-        const currentCoins = parseInt(JSON.parse(localStorage.getItem('user'))?.coins) || 0;
+        const currentCoins = user?.coins || parseInt(JSON.parse(localStorage.getItem('user'))?.coins) || 0;
         updateUser({
           coins: currentCoins + Math.floor(data.activeTarget.target_amount / 100),
         });

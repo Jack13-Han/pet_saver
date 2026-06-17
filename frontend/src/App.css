@@ -1766,13 +1766,30 @@ select.form-input {
 
 /* RESPONSIVE */
 @media (max-width: 1024px) {
+  .mobile-header {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background-color: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 20px;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 40;
+    box-shadow: var(--shadow-sm);
+  }
   .dashboard-grid {
     grid-template-columns: 1fr;
   }
   .main-content {
     margin-left: 0;
     max-width: 100%;
-    padding: 16px 20px;
+    padding: 80px 20px 20px;
   }
   .sidebar {
     transform: translateX(-100%);
@@ -1786,7 +1803,7 @@ select.form-input {
 
 @media (max-width: 640px) {
   .main-content {
-    padding: 16px 12px;
+    padding: 80px 12px 20px;
   }
   .page-header {
     flex-direction: column;

@@ -69,6 +69,7 @@ CREATE TABLE
         user_id INT NOT NULL,
         amount DECIMAL(15, 2) NOT NULL,
         type ENUM ('deposit', 'withdrawal') NOT NULL,
+        category VARCHAR(50) DEFAULT 'General',
         note VARCHAR(255),
         transaction_date DATE NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
