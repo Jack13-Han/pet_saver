@@ -175,7 +175,7 @@ if ($path === 'dashboard' && $method === 'GET') {
         a.mood, a.accessories
     FROM targets t
     LEFT JOIN avatars a ON t.id = a.target_id
-    WHERE t.user_id = ? AND t.status = 'active'
+    WHERE t.user_id = ?
     ORDER BY t.created_at DESC LIMIT 1
     ");
     $stmt->execute([$userId]);
@@ -278,6 +278,40 @@ if ($path === 'targets' && $method === 'POST') {
 
 
         $pdo->prepare("INSERT INTO avatars (target_id) VALUES (?)")->execute([$targetId]);
+
+        // ROLLOVER LOGIC: Move excess savings from previous targets to this new target
+        $stmt = $pdo->prepare("SELECT id, current_amount, target_amount FROM targets WHERE user_id = ? AND current_amount > target_amount AND id != ?");
+        $stmt->execute([$userId, $targetId]);
+        $excessTargets = $stmt->fetchAll();
+
+        $totalExcess = 0;
+        foreach ($excessTargets as $et) {
+            $excess = $et['current_amount'] - $et['target_amount'];
+            $totalExcess += $excess;
+            // Cap the old target to its target_amount
+            $pdo->prepare("UPDATE targets SET current_amount = target_amount WHERE id = ?")->execute([$et['id']]);
+            // Record a withdrawal for the deduction to balance ledger
+            $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, 'withdrawal', 'Rollover to new goal', NOW())")->execute([$et['id'], $userId, $excess]);
+        }
+
+        if ($totalExcess > 0) {
+            // Apply excess to the new target
+            $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, 'deposit', 'Rollover from previous goal', NOW())")->execute([$targetId, $userId, $totalExcess]);
+            
+            $progress = ($totalExcess / $targetAmount) * 100;
+            $status = $progress >= 100 ? 'completed' : 'active';
+            $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$totalExcess, $status, $targetId]);
+            
+            // update avatar mood
+            $mood = 'neutral';
+            if ($progress >= 100) $mood = 'celebrating';
+            elseif ($progress >= 70) $mood = 'happy';
+            elseif ($progress >= 40) $mood = 'neutral';
+            elseif ($progress > 0) $mood = 'sad';
+            else $mood = 'dirty';
+            $happiness = min(100, max(0, 50 + ($progress - 50)));
+            $pdo->prepare("UPDATE avatars SET mood = ?, happiness = ? WHERE target_id = ?")->execute([$mood, $happiness, $targetId]);
+        }
 
         $pdo->commit();
         successResponse(['target_id' => $targetId], 'Target created');
