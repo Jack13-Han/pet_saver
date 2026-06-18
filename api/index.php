@@ -28,6 +28,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 $path = $_GET['route'] ?? '';
 $path = trim($path, '/');
 
+
 $input = json_decode(file_get_contents('php://input'), true);
 
 //newly added
