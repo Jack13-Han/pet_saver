@@ -3,12 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ShoppingBag, Coins, Lock } from 'lucide-react'
 import { shop as shopApi } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { avatarTypes } from '../petAssets.js'
 
 const categories = [
   { id: 'all', label: 'All', icon: '🛍️' },
+  { id: 'avatar', label: 'Avatars', icon: '🐾' },
   { id: 'hat', label: 'Hats', icon: '🧢' },
-  { id: 'glasses', label: 'Glasses', icon: '👓' },
-  { id: 'scarf', label: 'Scarves', icon: '🧣' },
   { id: 'toy', label: 'Toys', icon: '🎾' },
   { id: 'background', label: 'Decor', icon: '🪴' },
 ]
@@ -42,7 +42,12 @@ export default function Shop() {
     finally { setPurchasing(null) }
   }
 
-  const filtered = category === 'all' ? items : items.filter(i => i.category === category)
+  const visibleItems = items.filter(i => !['glasses', 'scarf'].includes(i.category))
+  const filtered = category === 'all' ? visibleItems : visibleItems.filter(i => i.category === category)
+  const getItemIcon = (item) => {
+    if (item.avatar_type) return avatarTypes.find(type => type.id === item.avatar_type)?.emoji || item.icon
+    return item.icon
+  }
 
   if (loading) return <div className="loading-screen"><div className="loading-paw">🐾</div></div>
 
@@ -51,7 +56,7 @@ export default function Shop() {
       <div className="page-header">
         <div className="page-title">
           <h2>Shop 🛒</h2>
-          <p>Spend your coins on cool accessories!</p>
+          <p>Spend coins to unlock new avatars and rewards!</p>
         </div>
         <div className="streak-badge" style={{ background: 'var(--accent-yellow-light)', color: 'var(--accent-yellow)' }}>
           <Coins size={20} />
@@ -81,7 +86,7 @@ export default function Shop() {
             <motion.div key={item.id} className={`shop-item ${item.owned ? 'owned' : ''}`}
               initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }} onClick={() => handleBuy(item)}>
               {item.owned && <div className="shop-item-owned-badge">Owned</div>}
-              <span className="shop-item-icon">{item.icon}</span>
+              <span className="shop-item-icon">{getItemIcon(item)}</span>
               <div className="shop-item-name">{item.name}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 8 }}>{item.description}</div>
               <div className="shop-item-price">🪙 {item.price}</div>

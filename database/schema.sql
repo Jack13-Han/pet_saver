@@ -40,7 +40,7 @@ CREATE TABLE
         category VARCHAR(50) DEFAULT 'General',
         deadline DATE,
         status ENUM ('active', 'completed', 'failed') DEFAULT 'active',
-        avatar_type ENUM ('dog', 'cat', 'tree', 'bird', 'rabbit') DEFAULT 'dog',
+        avatar_type ENUM ('dog', 'cat', 'tree', 'bird', 'rabbit', 'pig') DEFAULT 'dog',
         avatar_name VARCHAR(50) DEFAULT 'Mochi',
         completion_date TIMESTAMP NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -89,7 +89,8 @@ CREATE TABLE
             'scarf',
             'collar',
             'toy',
-            'background'
+            'background',
+            'avatar'
         ) DEFAULT 'hat',
         effect_happiness INT DEFAULT 0,
         effect_energy INT DEFAULT 0,
@@ -235,4 +236,20 @@ VALUES
         'sunglasses',
         'glasses',
         12
+    ),
+    (
+        'Rabbit Avatar',
+        'Unlock the rabbit avatar for new goals',
+        600,
+        'rabbit',
+        'avatar',
+        0
+    ),
+    (
+        'Pig Avatar',
+        'Unlock the pig avatar for new goals',
+        700,
+        'pig',
+        'avatar',
+        0
     );

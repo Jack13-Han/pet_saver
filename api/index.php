@@ -23,11 +23,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
 require_once 'config.php';
+
+const MAX_MONEY_AMOUNT = 9999999999999.99;
+const STARTER_AVATAR_TYPES = ['dog', 'cat'];
+const AVATAR_UNLOCKS = [
+    [
+        'type' => 'rabbit',
+        'name' => 'Rabbit Avatar',
+        'description' => 'Unlock the rabbit avatar for new goals',
+        'price' => 600,
+        'icon' => 'rabbit',
+    ],
+    [
+        'type' => 'pig',
+        'name' => 'Pig Avatar',
+        'description' => 'Unlock the pig avatar for new goals',
+        'price' => 700,
+        'icon' => 'pig',
+    ],
+];
+
+set_exception_handler(function (Throwable $e) use ($pdo) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+
+    http_response_code(500);
+    header("Content-Type: application/json; charset=UTF-8");
+    echo json_encode([
+        'success' => false,
+        'error' => 'Server error. Please try again.'
+    ]);
+    exit();
+});
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -194,9 +228,12 @@ if ($path === 'dashboard' && $method === 'GET') {
     $stmt->execute([$userId]);
     $achievements = $stmt->fetchAll();
 
-    $stmt = $pdo->prepare("SELECT * FROM accessories ORDER BY price LIMIT 4");
-    $stmt->execute();
-    $shopPreview = $stmt->fetchAll();
+    ensureAvatarShopItems($pdo);
+    $avatarNames = avatarUnlockNames();
+    $placeholders = implode(',', array_fill(0, count($avatarNames), '?'));
+    $stmt = $pdo->prepare("SELECT * FROM accessories WHERE name IN ($placeholders) ORDER BY price LIMIT 4");
+    $stmt->execute($avatarNames);
+    $shopPreview = normalizeShopItems($stmt->fetchAll());
 
     successResponse(['user' => $userData, 'activeTarget' => $activeTarget, 'transactions' => $transactions, 'achievements' => $achievements, 'shopPreview' => $shopPreview]);
 }
@@ -217,6 +254,29 @@ if ($path === 'targets' && $method === 'POST') {
     $name = trim($input['name'] ?? '');
     $targetAmount = floatval($input['target_amount'] ?? 0);
     if (empty($name) || $targetAmount <= 0) errorResponse('Name and target amount required');
+    ensureTargetAvatarTypes($pdo);
+    ensureAvatarShopItems($pdo);
+
+    $avatarType = strtolower(trim($input['avatar_type'] ?? 'dog'));
+    $validAvatarTypes = array_merge(STARTER_AVATAR_TYPES, array_column(AVATAR_UNLOCKS, 'type'));
+    if (!in_array($avatarType, $validAvatarTypes, true)) {
+        errorResponse('Invalid avatar type');
+    }
+
+    if (!in_array($avatarType, STARTER_AVATAR_TYPES, true)) {
+        $unlockName = avatarUnlockNameForType($avatarType);
+        $stmt = $pdo->prepare("
+            SELECT i.id
+            FROM inventory i
+            JOIN accessories a ON i.accessory_id = a.id
+            WHERE i.user_id = ? AND a.name = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$userId, $unlockName]);
+        if (!$stmt->fetch()) {
+            errorResponse('Buy this avatar in the shop first.', 403);
+        }
+    }
 
     // Check if user already has an active goal
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM targets WHERE user_id = ? AND status = 'active'");
@@ -229,7 +289,7 @@ if ($path === 'targets' && $method === 'POST') {
 
     try {
         $stmt = $pdo->prepare("INSERT INTO targets (user_id, name, description, target_amount, category, deadline, avatar_type, avatar_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$userId, $name, $input['description'] ?? '', $targetAmount, $input['category'] ?? 'General', $input['deadline'] ?? null, $input['avatar_type'] ?? 'dog', trim($input['avatar_name'] ?? 'Mochi')]);
+        $stmt->execute([$userId, $name, $input['description'] ?? '', $targetAmount, $input['category'] ?? 'General', $input['deadline'] ?? null, $avatarType, trim($input['avatar_name'] ?? 'Mochi')]);
 
         $targetId = $pdo->lastInsertId();
         // Check if user already has an active goal
@@ -292,15 +352,33 @@ if (preg_match('/^targets\/(\d+)$/', $path, $m) && $method === 'DELETE') {
 
 if ($path === 'transactions' && $method === 'POST') {
     $targetId = intval($input['target_id'] ?? 0);
-    $amount = floatval($input['amount'] ?? 0);
+    $amountInput = $input['amount'] ?? null;
+    $amount = is_numeric($amountInput) ? round((float)$amountInput, 2) : 0;
     $type = $input['type'] ?? '';
     if ($targetId <= 0 || $amount <= 0 || !in_array($type, ['deposit', 'withdrawal'])) errorResponse('Invalid data');
+    if (!is_finite($amount) || $amount > MAX_MONEY_AMOUNT) {
+        errorResponse('Amount is too large. Please enter a value up to 9,999,999,999,999.99');
+    }
 
-    $pdo->beginTransaction();
     $stmt = $pdo->prepare("SELECT * FROM targets WHERE id = ? AND user_id = ?");
     $stmt->execute([$targetId, $userId]);
     $target = $stmt->fetch();
     if (!$target) errorResponse('Target not found');
+
+    if ($type === 'deposit' && ((float)$target['current_amount'] + $amount) > MAX_MONEY_AMOUNT) {
+        errorResponse('Amount is too large for this goal');
+    }
+
+    if ($type === 'deposit') {
+        $stmt = $pdo->prepare("SELECT total_saved FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $totalSaved = (float)$stmt->fetchColumn();
+        if (($totalSaved + $amount) > MAX_MONEY_AMOUNT) {
+            errorResponse('Amount is too large for your account totals');
+        }
+    }
+
+    $pdo->beginTransaction();
 
     $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, ?, ?, ?)")
         ->execute([$targetId, $userId, $amount, $type, $input['note'] ?? '', $input['date'] ?? date('Y-m-d')]);
@@ -313,9 +391,15 @@ if ($path === 'transactions' && $method === 'POST') {
     }
 
     $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
+    $displayProgress = min(100, $progress);
     $status = $progress >= 100 ? 'completed' : 'active';
 
-    $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$newAmount, $status, $targetId]);
+    if ($status === 'completed') {
+        $pdo->prepare("UPDATE targets SET current_amount = ?, status = ?, completion_date = COALESCE(completion_date, NOW()) WHERE id = ?")->execute([$newAmount, $status, $targetId]);
+        $pdo->prepare("UPDATE users SET active_target_id = NULL WHERE id = ? AND active_target_id = ?")->execute([$userId, $targetId]);
+    } else {
+        $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$newAmount, $status, $targetId]);
+    }
 
     $mood = 'neutral';
     if ($progress >= 100) $mood = 'celebrating';
@@ -335,7 +419,7 @@ if ($path === 'transactions' && $method === 'POST') {
 
     checkAchievements($pdo, $userId);
     $pdo->commit();
-    successResponse(['new_amount' => $newAmount, 'progress' => round($progress, 1), 'status' => $status, 'mood' => $mood], 'Transaction recorded');
+    successResponse(['new_amount' => $newAmount, 'progress' => round($displayProgress, 1), 'actual_progress' => round($progress, 1), 'status' => $status, 'mood' => $mood], 'Transaction recorded');
 }
 
 if ($path === 'transactions' && $method === 'GET') {
@@ -408,28 +492,41 @@ if ($path === 'avatars/care' && $method === 'POST') {
 }
 
 if ($path === 'shop' && $method === 'GET') {
+    ensureAvatarShopItems($pdo);
     $category = $_GET['category'] ?? null;
-    if ($category) {
-        $stmt = $pdo->prepare("SELECT * FROM accessories WHERE category = ? ORDER BY price");
+    if ($category === 'avatar') {
+        $avatarNames = avatarUnlockNames();
+        $placeholders = implode(',', array_fill(0, count($avatarNames), '?'));
+        $stmt = $pdo->prepare("SELECT * FROM accessories WHERE name IN ($placeholders) ORDER BY price");
+        $stmt->execute($avatarNames);
+    } elseif ($category) {
+        $stmt = $pdo->prepare("SELECT * FROM accessories WHERE category = ? AND category NOT IN ('glasses', 'scarf') ORDER BY price");
         $stmt->execute([$category]);
     } else {
-        $stmt = $pdo->query("SELECT * FROM accessories ORDER BY price");
+        $stmt = $pdo->query("SELECT * FROM accessories WHERE category NOT IN ('glasses', 'scarf') ORDER BY price");
     }
     $items = $stmt->fetchAll();
     $stmt = $pdo->prepare("SELECT accessory_id FROM inventory WHERE user_id = ?");
     $stmt->execute([$userId]);
     $owned = array_column($stmt->fetchAll(), 'accessory_id');
-    foreach ($items as &$item) $item['owned'] = in_array($item['id'], $owned);
-    successResponse($items);
+    successResponse(normalizeShopItems($items, $owned));
 }
 
 if ($path === 'shop/buy' && $method === 'POST') {
+    ensureAvatarShopItems($pdo);
     $accessoryId = intval($input['accessory_id'] ?? 0);
     $targetId = intval($input['target_id'] ?? 0);
     $stmt = $pdo->prepare("SELECT * FROM accessories WHERE id = ?");
     $stmt->execute([$accessoryId]);
     $item = $stmt->fetch();
     if (!$item) errorResponse('Item not found');
+    if (in_array($item['category'], ['glasses', 'scarf'], true)) {
+        errorResponse('This item is not available');
+    }
+    $stmt = $pdo->prepare("SELECT id FROM inventory WHERE user_id = ? AND accessory_id = ? AND target_id IS NULL LIMIT 1");
+    $stmt->execute([$userId, $accessoryId]);
+    if ($stmt->fetch()) errorResponse('Item already owned');
+
     $stmt = $pdo->prepare("SELECT coins FROM users WHERE id = ?");
     $stmt->execute([$userId]);
     $userCoins = $stmt->fetchColumn();
@@ -458,7 +555,11 @@ if ($path === 'achievements' && $method === 'GET') {
 
 if ($path === 'receipts' && $method === 'POST') {
     $targetId = intval($input['target_id'] ?? 0);
-    $totalPrice = floatval($input['total_price'] ?? 0);
+    $totalPriceInput = $input['total_price'] ?? null;
+    $totalPrice = is_numeric($totalPriceInput) ? round((float)$totalPriceInput, 2) : 0;
+    if ($totalPrice < 0 || !is_finite($totalPrice) || $totalPrice > MAX_MONEY_AMOUNT) {
+        errorResponse('Receipt total is too large');
+    }
     $pdo->prepare("INSERT INTO receipts (user_id, image_path, shop_name, total_price, receipt_date, category, items, target_id, is_processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)")
         ->execute([$userId, $input['image_path'] ?? null, trim($input['shop_name'] ?? ''), $totalPrice, $input['date'] ?? date('Y-m-d'), $input['category'] ?? 'Shopping', json_encode($input['items'] ?? []), $targetId]);
     $receiptId = $pdo->lastInsertId();
@@ -470,10 +571,18 @@ if ($path === 'receipts' && $method === 'POST') {
         $stmt->execute([$targetId]);
         $target = $stmt->fetch();
         if ($target) {
+            if (((float)$target['current_amount'] + $totalPrice) > MAX_MONEY_AMOUNT) {
+                errorResponse('Receipt total is too large for this goal');
+            }
             $newAmount = $target['current_amount'] + $totalPrice;
             $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
             $status = $progress >= 100 ? 'completed' : 'active';
-            $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$newAmount, $status, $targetId]);
+            if ($status === 'completed') {
+                $pdo->prepare("UPDATE targets SET current_amount = ?, status = ?, completion_date = COALESCE(completion_date, NOW()) WHERE id = ?")->execute([$newAmount, $status, $targetId]);
+                $pdo->prepare("UPDATE users SET active_target_id = NULL WHERE id = ? AND active_target_id = ?")->execute([$userId, $targetId]);
+            } else {
+                $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$newAmount, $status, $targetId]);
+            }
         }
     }
     $pdo->prepare("UPDATE achievements SET progress = progress + 1 WHERE user_id = ? AND title = 'Receipt Pro'")->execute([$userId]);
@@ -495,6 +604,108 @@ if ($path === 'rankings' && $method === 'GET') {
 }
 
 // HELPERS
+function avatarUnlockNames()
+{
+    return array_map(fn($unlock) => $unlock['name'], AVATAR_UNLOCKS);
+}
+
+function avatarUnlockNameForType($avatarType)
+{
+    foreach (AVATAR_UNLOCKS as $unlock) {
+        if ($unlock['type'] === $avatarType) {
+            return $unlock['name'];
+        }
+    }
+
+    return null;
+}
+
+function avatarUnlockTypeForName($name)
+{
+    foreach (AVATAR_UNLOCKS as $unlock) {
+        if ($unlock['name'] === $name) {
+            return $unlock['type'];
+        }
+    }
+
+    return null;
+}
+
+function ensureTargetAvatarTypes($pdo)
+{
+    try {
+        $column = $pdo->query("SHOW COLUMNS FROM targets LIKE 'avatar_type'")->fetch();
+        if ($column && strpos($column['Type'], "'pig'") === false) {
+            $pdo->exec("ALTER TABLE targets MODIFY avatar_type ENUM('dog','cat','tree','bird','rabbit','pig') DEFAULT 'dog'");
+        }
+    } catch (Throwable $e) {
+        // Older local databases may already be compatible or lack DDL permissions.
+    }
+}
+
+function ensureAccessoryAvatarCategory($pdo)
+{
+    try {
+        $column = $pdo->query("SHOW COLUMNS FROM accessories LIKE 'category'")->fetch();
+        if ($column && strpos($column['Type'], "'avatar'") === false) {
+            $pdo->exec("ALTER TABLE accessories MODIFY category ENUM('hat','glasses','scarf','collar','toy','background','avatar') DEFAULT 'hat'");
+        }
+    } catch (Throwable $e) {
+        // Fallback category below keeps the shop working without DDL permissions.
+    }
+}
+
+function getAvatarAccessoryCategory($pdo)
+{
+    try {
+        $column = $pdo->query("SHOW COLUMNS FROM accessories LIKE 'category'")->fetch();
+        if ($column && strpos($column['Type'], "'avatar'") !== false) {
+            return 'avatar';
+        }
+    } catch (Throwable $e) {
+        return 'toy';
+    }
+
+    return 'toy';
+}
+
+function ensureAvatarShopItems($pdo)
+{
+    ensureAccessoryAvatarCategory($pdo);
+    $category = getAvatarAccessoryCategory($pdo);
+
+    foreach (AVATAR_UNLOCKS as $unlock) {
+        $stmt = $pdo->prepare("SELECT id FROM accessories WHERE name = ?");
+        $stmt->execute([$unlock['name']]);
+        $id = $stmt->fetchColumn();
+
+        if ($id) {
+            $stmt = $pdo->prepare("UPDATE accessories SET description = ?, price = ?, icon = ?, category = ? WHERE id = ?");
+            $stmt->execute([$unlock['description'], $unlock['price'], $unlock['icon'], $category, $id]);
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO accessories (name, description, price, icon, category, effect_happiness, effect_energy) VALUES (?, ?, ?, ?, ?, 0, 0)");
+            $stmt->execute([$unlock['name'], $unlock['description'], $unlock['price'], $unlock['icon'], $category]);
+        }
+    }
+}
+
+function normalizeShopItems($items, $owned = [])
+{
+    $ownedIds = array_map('intval', $owned);
+
+    foreach ($items as &$item) {
+        $avatarType = avatarUnlockTypeForName($item['name'] ?? '');
+        if ($avatarType) {
+            $item['category'] = 'avatar';
+            $item['avatar_type'] = $avatarType;
+            $item['icon'] = $avatarType;
+        }
+        $item['owned'] = in_array((int)$item['id'], $ownedIds, true);
+    }
+
+    return $items;
+}
+
 function checkAchievements($pdo, $userId)
 {
 
@@ -607,7 +818,7 @@ function updateRank($pdo, $userId)
     elseif ($completed >= 10) $rank = 'Diamond';
     elseif ($completed >= 5) $rank = 'Gold';
     elseif ($completed >= 1) $rank = 'Silver';
-    $pdo->prepare("UPDATE users SET rank = ? WHERE id = ? AND rank != ?")->execute([$rank, $userId, $rank]);
+    $pdo->prepare("UPDATE users SET `rank` = ? WHERE id = ? AND `rank` != ?")->execute([$rank, $userId, $rank]);
 }
 
 errorResponse(

@@ -33,7 +33,7 @@ CREATE TABLE `accessories` (
   `description` text COLLATE utf8mb4_unicode_ci,
   `price` int NOT NULL,
   `icon` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'hat',
-  `category` enum('hat','glasses','scarf','collar','toy','background') COLLATE utf8mb4_unicode_ci DEFAULT 'hat',
+  `category` enum('hat','glasses','scarf','collar','toy','background','avatar') COLLATE utf8mb4_unicode_ci DEFAULT 'hat',
   `effect_happiness` int DEFAULT '0',
   `effect_energy` int DEFAULT '0',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
@@ -51,7 +51,9 @@ INSERT INTO `accessories` (`id`, `name`, `description`, `price`, `icon`, `catego
 (5, 'Golden Collar', 'Premium collar for champions', 1000, 'collar', 'collar', 15, 0, '2026-05-27 16:52:44'),
 (6, 'Flower Pot', 'Decorate your background', 600, 'plant', 'background', 10, 0, '2026-05-27 16:52:44'),
 (7, 'Party Hat', 'Celebrate your achievements', 800, 'party-hat', 'hat', 20, 0, '2026-05-27 16:52:44'),
-(8, 'Sunglasses', 'Cool shades for sunny days', 700, 'sunglasses', 'glasses', 12, 0, '2026-05-27 16:52:44');
+(8, 'Sunglasses', 'Cool shades for sunny days', 700, 'sunglasses', 'glasses', 12, 0, '2026-05-27 16:52:44'),
+(9, 'Rabbit Avatar', 'Unlock the rabbit avatar for new goals', 600, 'rabbit', 'avatar', 0, 0, '2026-06-18 00:00:00'),
+(10, 'Pig Avatar', 'Unlock the pig avatar for new goals', 700, 'pig', 'avatar', 0, 0, '2026-06-18 00:00:00');
 
 -- --------------------------------------------------------
 
@@ -187,7 +189,7 @@ CREATE TABLE `targets` (
   `category` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'General',
   `deadline` date DEFAULT NULL,
   `status` enum('active','completed','failed') COLLATE utf8mb4_unicode_ci DEFAULT 'active',
-  `avatar_type` enum('dog','cat','tree','bird','rabbit') COLLATE utf8mb4_unicode_ci DEFAULT 'dog',
+  `avatar_type` enum('dog','cat','tree','bird','rabbit','pig') COLLATE utf8mb4_unicode_ci DEFAULT 'dog',
   `avatar_name` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'Mochi',
   `completion_date` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
@@ -403,7 +405,7 @@ ALTER TABLE `users`
 -- テーブルの AUTO_INCREMENT `accessories`
 --
 ALTER TABLE `accessories`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- テーブルの AUTO_INCREMENT `achievements`

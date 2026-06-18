@@ -24,21 +24,8 @@ import {
 import { useAuth } from "../context/AuthContext.jsx";
 import { realOCR } from "./ReceiptScanner.jsx";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { avatarEmojis, avatarTypes, getPetImageForTarget } from "../petAssets.js";
 
-import catIdle from "../assets/pets/cat_idle.png";
-import catHappy from "../assets/pets/cat_happy.png";
-import catSad from "../assets/pets/cat_sad.png";
-import catAngry from "../assets/pets/cat_angry.png";
-import catDirty from "../assets/pets/cat_dirty.png";
-import catCelebrate from "../assets/pets/cat_celebrate.png";
-
-const avatarEmojis = {
-  dog: "🐕",
-  cat: "🐈",
-  tree: "🌳",
-  bird: "🐦",
-  rabbit: "🐇",
-};
 const moodEmojis = {
   happy: "😊",
   neutral: "😐",
@@ -93,6 +80,16 @@ export default function Dashboard() {
   };
   const target = data?.activeTarget;
   const progress = target?.progress || 0;
+  const daysUntilDeadline = target?.deadline
+    ? Math.ceil((new Date(target.deadline) - new Date()) / 86400000)
+    : null;
+  const showDeadlineWarning =
+    target && target.deadline && progress < 100 && daysUntilDeadline !== null && daysUntilDeadline >= 0 && daysUntilDeadline <= 3;
+  const shopPreview = (data?.shopPreview || []).filter(item => !['glasses', 'scarf'].includes(item.category));
+  const getShopPreviewIcon = (item) => {
+    if (item.avatar_type) return avatarTypes.find(type => type.id === item.avatar_type)?.emoji || item.icon;
+    return item.icon;
+  };
   const quickSaveDate = new Date().toLocaleString("en-US", {
     month: "numeric",
     day: "numeric",
@@ -123,19 +120,7 @@ export default function Dashboard() {
   };
 
   const getPetImage = () => {
-    if (!target) return catIdle;
-
-    if (target.progress >= 100) return catCelebrate;
-
-    if (target.cleanliness < 30) return catDirty;
-
-    if (target.happiness < 20) return catSad;
-
-    if (target.energy < 20) return catAngry;
-
-    if (target.progress >= 50) return catHappy;
-
-    return catIdle;
+    return getPetImageForTarget(target);
   };
 
   const getPetMoodClass = () => {
@@ -296,6 +281,25 @@ export default function Dashboard() {
             exit={{ x: 100, opacity: 0 }}
           >
             {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showDeadlineWarning && (
+          <motion.div
+            className="deadline-warning"
+            initial={{ opacity: 0, y: -18, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -18, scale: 0.96 }}
+          >
+            <div className="deadline-warning-icon">⏰</div>
+            <div>
+              <div className="deadline-warning-title">Deadline is near</div>
+              <div className="deadline-warning-copy">
+                {target.name} has {daysUntilDeadline === 0 ? 'less than 1 day' : `${daysUntilDeadline} day${daysUntilDeadline === 1 ? '' : 's'}`} left.
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -702,6 +706,8 @@ export default function Dashboard() {
                         <input
                           type="number"
                           min="1"
+                          max="9999999999999.99"
+                          step="0.01"
                           inputMode="numeric"
                           className="w-full border-0 bg-transparent text-xl font-bold text-slate-900 outline-none placeholder:text-slate-400"
                           style={{
@@ -1133,9 +1139,9 @@ export default function Dashboard() {
               className="shop-grid"
               style={{ gridTemplateColumns: "repeat(2, 1fr)" }}
             >
-              {data?.shopPreview?.map((item) => (
+              {shopPreview.map((item) => (
                 <div key={item.id} className="shop-item">
-                  <span className="shop-item-icon">{item.icon}</span>
+                  <span className="shop-item-icon">{getShopPreviewIcon(item)}</span>
                   <div className="shop-item-name">{item.name}</div>
                   <div className="shop-item-price">🪙 {item.price}</div>
                 </div>
