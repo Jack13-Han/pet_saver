@@ -16,6 +16,11 @@ export const avatarTypes = [
   { id: "cat", emoji: "\u{1F408}", name: "Cat", requiresPurchase: false },
   { id: "rabbit", emoji: "\u{1F407}", name: "Rabbit", requiresPurchase: true },
   { id: "pig", emoji: "\u{1F437}", name: "Pig", requiresPurchase: true },
+  { id: "bird", emoji: "\u{1F426}", name: "Bird", requiresPurchase: true },
+  { id: "naruto", emoji: "\u{1F365}", name: "Naruto", requiresPurchase: true },
+  { id: "pikachu", emoji: "\u{26A1}", name: "Pikachu", requiresPurchase: true },
+  { id: "chiikawa", emoji: "\u{1F439}", name: "Chiikawa", requiresPurchase: true },
+  { id: "lufy", emoji: "\u{1F3F4}\u{200D}\u{2620}\u{FE0F}", name: "Lufy", requiresPurchase: true },
 ];
 
 export const avatarEmojis = Object.fromEntries(
@@ -39,6 +44,7 @@ export const getPetImage = (avatarType = "cat", state = "idle") => {
   return (
     petImages[`${type}_${imageState}`] ||
     petImages[`${type}_idle`] ||
+    petImages[type] ||
     petImages[`cat_${imageState}`] ||
     petImages.cat_idle
   );

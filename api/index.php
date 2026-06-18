@@ -47,6 +47,41 @@ const AVATAR_UNLOCKS = [
         'price' => 700,
         'icon' => 'pig',
     ],
+    [
+        'type' => 'bird',
+        'name' => 'Bird Avatar',
+        'description' => 'Unlock the bird avatar for new goals',
+        'price' => 800,
+        'icon' => 'bird',
+    ],
+    [
+        'type' => 'naruto',
+        'name' => 'Naruto Avatar',
+        'description' => 'Unlock the Naruto avatar for new goals',
+        'price' => 900,
+        'icon' => 'naruto',
+    ],
+    [
+        'type' => 'pikachu',
+        'name' => 'Pikachu Avatar',
+        'description' => 'Unlock the Pikachu avatar for new goals',
+        'price' => 1000,
+        'icon' => 'pikachu',
+    ],
+    [
+        'type' => 'chiikawa',
+        'name' => 'Chiikawa Avatar',
+        'description' => 'Unlock the Chiikawa avatar for new goals',
+        'price' => 1100,
+        'icon' => 'chiikawa',
+    ],
+    [
+        'type' => 'lufy',
+        'name' => 'Lufy Avatar',
+        'description' => 'Unlock the Lufy avatar for new goals',
+        'price' => 1200,
+        'icon' => 'lufy',
+    ],
 ];
 
 set_exception_handler(function (Throwable $e) use ($pdo) {
@@ -635,8 +670,8 @@ function ensureTargetAvatarTypes($pdo)
 {
     try {
         $column = $pdo->query("SHOW COLUMNS FROM targets LIKE 'avatar_type'")->fetch();
-        if ($column && strpos($column['Type'], "'pig'") === false) {
-            $pdo->exec("ALTER TABLE targets MODIFY avatar_type ENUM('dog','cat','tree','bird','rabbit','pig') DEFAULT 'dog'");
+        if ($column && strpos($column['Type'], "'lufy'") === false) {
+            $pdo->exec("ALTER TABLE targets MODIFY avatar_type ENUM('dog','cat','tree','bird','rabbit','pig','naruto','pikachu','chiikawa','lufy') DEFAULT 'dog'");
         }
     } catch (Throwable $e) {
         // Older local databases may already be compatible or lack DDL permissions.

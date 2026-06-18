@@ -40,7 +40,18 @@ CREATE TABLE
         category VARCHAR(50) DEFAULT 'General',
         deadline DATE,
         status ENUM ('active', 'completed', 'failed') DEFAULT 'active',
-        avatar_type ENUM ('dog', 'cat', 'tree', 'bird', 'rabbit', 'pig') DEFAULT 'dog',
+        avatar_type ENUM (
+            'dog',
+            'cat',
+            'tree',
+            'bird',
+            'rabbit',
+            'pig',
+            'naruto',
+            'pikachu',
+            'chiikawa',
+            'lufy'
+        ) DEFAULT 'dog',
         avatar_name VARCHAR(50) DEFAULT 'Mochi',
         completion_date TIMESTAMP NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -250,6 +261,46 @@ VALUES
         'Unlock the pig avatar for new goals',
         700,
         'pig',
+        'avatar',
+        0
+    ),
+    (
+        'Bird Avatar',
+        'Unlock the bird avatar for new goals',
+        800,
+        'bird',
+        'avatar',
+        0
+    ),
+    (
+        'Naruto Avatar',
+        'Unlock the Naruto avatar for new goals',
+        900,
+        'naruto',
+        'avatar',
+        0
+    ),
+    (
+        'Pikachu Avatar',
+        'Unlock the Pikachu avatar for new goals',
+        1000,
+        'pikachu',
+        'avatar',
+        0
+    ),
+    (
+        'Chiikawa Avatar',
+        'Unlock the Chiikawa avatar for new goals',
+        1100,
+        'chiikawa',
+        'avatar',
+        0
+    ),
+    (
+        'Lufy Avatar',
+        'Unlock the Lufy avatar for new goals',
+        1200,
+        'lufy',
         'avatar',
         0
     );

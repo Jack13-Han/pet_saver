@@ -53,7 +53,12 @@ INSERT INTO `accessories` (`id`, `name`, `description`, `price`, `icon`, `catego
 (7, 'Party Hat', 'Celebrate your achievements', 800, 'party-hat', 'hat', 20, 0, '2026-05-27 16:52:44'),
 (8, 'Sunglasses', 'Cool shades for sunny days', 700, 'sunglasses', 'glasses', 12, 0, '2026-05-27 16:52:44'),
 (9, 'Rabbit Avatar', 'Unlock the rabbit avatar for new goals', 600, 'rabbit', 'avatar', 0, 0, '2026-06-18 00:00:00'),
-(10, 'Pig Avatar', 'Unlock the pig avatar for new goals', 700, 'pig', 'avatar', 0, 0, '2026-06-18 00:00:00');
+(10, 'Pig Avatar', 'Unlock the pig avatar for new goals', 700, 'pig', 'avatar', 0, 0, '2026-06-18 00:00:00'),
+(11, 'Bird Avatar', 'Unlock the bird avatar for new goals', 800, 'bird', 'avatar', 0, 0, '2026-06-18 00:00:00'),
+(12, 'Naruto Avatar', 'Unlock the Naruto avatar for new goals', 900, 'naruto', 'avatar', 0, 0, '2026-06-18 00:00:00'),
+(13, 'Pikachu Avatar', 'Unlock the Pikachu avatar for new goals', 1000, 'pikachu', 'avatar', 0, 0, '2026-06-18 00:00:00'),
+(14, 'Chiikawa Avatar', 'Unlock the Chiikawa avatar for new goals', 1100, 'chiikawa', 'avatar', 0, 0, '2026-06-18 00:00:00'),
+(15, 'Lufy Avatar', 'Unlock the Lufy avatar for new goals', 1200, 'lufy', 'avatar', 0, 0, '2026-06-18 00:00:00');
 
 -- --------------------------------------------------------
 
@@ -189,7 +194,7 @@ CREATE TABLE `targets` (
   `category` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'General',
   `deadline` date DEFAULT NULL,
   `status` enum('active','completed','failed') COLLATE utf8mb4_unicode_ci DEFAULT 'active',
-  `avatar_type` enum('dog','cat','tree','bird','rabbit','pig') COLLATE utf8mb4_unicode_ci DEFAULT 'dog',
+  `avatar_type` enum('dog','cat','tree','bird','rabbit','pig','naruto','pikachu','chiikawa','lufy') COLLATE utf8mb4_unicode_ci DEFAULT 'dog',
   `avatar_name` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'Mochi',
   `completion_date` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
@@ -405,7 +410,7 @@ ALTER TABLE `users`
 -- テーブルの AUTO_INCREMENT `accessories`
 --
 ALTER TABLE `accessories`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- テーブルの AUTO_INCREMENT `achievements`
