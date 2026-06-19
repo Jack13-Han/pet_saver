@@ -17,9 +17,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
+
+// Convert PHP errors/warnings into ErrorExceptions
+set_error_handler(function($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) {
+        return;
+    }
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+// Catch all uncaught exceptions and output as JSON
+set_exception_handler(function($exception) {
+    header('Content-Type: application/json; charset=UTF-8');
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => $exception->getMessage(),
+        'file' => basename($exception->getFile()),
+        'line' => $exception->getLine()
+    ]);
+    exit();
+});
+
 
 require_once 'config.php';
 
@@ -27,6 +49,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 $path = $_GET['route'] ?? '';
 $path = trim($path, '/');
+
 
 $input = json_decode(file_get_contents('php://input'), true);
 
