@@ -29,7 +29,18 @@ CREATE TABLE
         category VARCHAR(50) DEFAULT 'General',
         deadline DATE,
         status ENUM ('active', 'completed', 'failed') DEFAULT 'active',
-        avatar_type ENUM ('dog', 'cat', 'tree', 'bird', 'rabbit') DEFAULT 'dog',
+        avatar_type ENUM (
+            'dog',
+            'cat',
+            'tree',
+            'bird',
+            'rabbit',
+            'pig',
+            'naruto',
+            'pikachu',
+            'chiikawa',
+            'lufy'
+        ) DEFAULT 'dog',
         avatar_name VARCHAR(50) DEFAULT 'Mochi',
         completion_date TIMESTAMP NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -79,7 +90,8 @@ CREATE TABLE
             'scarf',
             'collar',
             'toy',
-            'background'
+            'background',
+            'avatar'
         ) DEFAULT 'hat',
         effect_happiness INT DEFAULT 0,
         effect_energy INT DEFAULT 0,
@@ -143,7 +155,8 @@ CREATE TABLE
             'receipt_scan',
             'purchase',
             'goal_complete',
-            'login'
+            'login',
+            'care'
         ) NOT NULL,
         points INT DEFAULT 0,
         activity_date DATE NOT NULL,
@@ -225,4 +238,60 @@ VALUES
         'sunglasses',
         'glasses',
         12
+    ),
+    (
+        'Rabbit Avatar',
+        'Unlock the rabbit avatar for new goals',
+        600,
+        'rabbit',
+        'avatar',
+        0
+    ),
+    (
+        'Pig Avatar',
+        'Unlock the pig avatar for new goals',
+        700,
+        'pig',
+        'avatar',
+        0
+    ),
+    (
+        'Bird Avatar',
+        'Unlock the bird avatar for new goals',
+        800,
+        'bird',
+        'avatar',
+        0
+    ),
+    (
+        'Naruto Avatar',
+        'Unlock the Naruto avatar for new goals',
+        900,
+        'naruto',
+        'avatar',
+        0
+    ),
+    (
+        'Pikachu Avatar',
+        'Unlock the Pikachu avatar for new goals',
+        1000,
+        'pikachu',
+        'avatar',
+        0
+    ),
+    (
+        'Chiikawa Avatar',
+        'Unlock the Chiikawa avatar for new goals',
+        1100,
+        'chiikawa',
+        'avatar',
+        0
+    ),
+    (
+        'Lufy Avatar',
+        'Unlock the Lufy avatar for new goals',
+        1200,
+        'lufy',
+        'avatar',
+        0
     );

@@ -67,9 +67,21 @@ export function AuthProvider({ children }) {
   };
 
   const updateUser = (updates) => {
-    const newUser = { ...user, ...updates };
-    setUser(newUser);
-    localStorage.setItem("user", JSON.stringify(newUser));
+    setUser((currentUser) => {
+      const nextUpdates =
+        typeof updates === "function" ? updates(currentUser) : updates;
+      const resolvedUpdates = Object.fromEntries(
+        Object.entries(nextUpdates || {}).map(([key, value]) => [
+          key,
+          typeof value === "function"
+            ? value(currentUser?.[key], currentUser)
+            : value,
+        ]),
+      );
+      const newUser = { ...currentUser, ...resolvedUpdates };
+      localStorage.setItem("user", JSON.stringify(newUser));
+      return newUser;
+    });
   };
 
   return (
