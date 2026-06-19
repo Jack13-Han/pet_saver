@@ -66,10 +66,13 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const updateUser = (updates) => {
-    const newUser = { ...user, ...updates };
+  const updateUser = async (updates) => {
+    const res = await userApi.update(updates);
+    const responseData = res.data || res;
+    const newUser = { ...user, ...responseData };
     setUser(newUser);
     localStorage.setItem("user", JSON.stringify(newUser));
+    return newUser;
   };
 
   return (

@@ -13,6 +13,8 @@ CREATE TABLE
         last_active DATE DEFAULT NULL,
         total_saved DECIMAL(15, 2) DEFAULT 0,
         total_targets_completed INT DEFAULT 0,
+        public_profile BOOLEAN DEFAULT FALSE,
+        show_on_leaderboard BOOLEAN DEFAULT TRUE,
         active_target_id INT DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP

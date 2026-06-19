@@ -13,6 +13,7 @@ import ReceiptScanner from './pages/ReceiptScanner.jsx'
 import Rankings from './pages/Rankings.jsx'
 import Settings from './pages/Settings.jsx'
 import Insights from './pages/Insights.jsx'
+import ExpenseAnalyst from './pages/ExpenseAnalyst.jsx'
 
 function App() {
   const { user, loading } = useAuth()
@@ -53,6 +54,7 @@ function App() {
           <Route path="/goals" element={<Goals />} />
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/insights" element={<Insights />} />
+          <Route path="/expense-analyst" element={<ExpenseAnalyst />} />
           <Route path="/shop" element={<Shop />} />
           <Route path="/achievements" element={<Achievements />} />
           <Route path="/scanner" element={<ReceiptScanner />} />

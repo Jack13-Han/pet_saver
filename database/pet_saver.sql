@@ -312,6 +312,8 @@ CREATE TABLE `users` (
   `last_active` date DEFAULT NULL,
   `total_saved` decimal(15,2) DEFAULT '0.00',
   `total_targets_completed` int DEFAULT '0',
+  `public_profile` tinyint(1) NOT NULL DEFAULT '0',
+  `show_on_leaderboard` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `active_target_id` int DEFAULT NULL
@@ -321,8 +323,8 @@ CREATE TABLE `users` (
 -- テーブルのデータのダンプ `users`
 --
 
-INSERT INTO `users` (`id`, `username`, `email`, `password_hash`, `coins`, `rank`, `streak_days`, `last_active`, `total_saved`, `total_targets_completed`, `created_at`, `updated_at`, `active_target_id`) VALUES
-(1, 'khant', 'khant@gmail.com', '$2y$10$oT2kykzKNGjGtfQvxjVm6u0B5vovZW6NsVdK9rm7ANPDNaAVtib/K', 500, 'Bronze', 1, '2026-06-02', 257703.00, 0, '2026-05-27 16:53:20', '2026-06-02 06:11:23', 2);
+INSERT INTO `users` (`id`, `username`, `email`, `password_hash`, `coins`, `rank`, `streak_days`, `last_active`, `total_saved`, `total_targets_completed`, `public_profile`, `show_on_leaderboard`, `created_at`, `updated_at`, `active_target_id`) VALUES
+(1, 'khant', 'khant@gmail.com', '$2y$10$oT2kykzKNGjGtfQvxjVm6u0B5vovZW6NsVdK9rm7ANPDNaAVtib/K', 500, 'Bronze', 1, '2026-06-02', 257703.00, 0, 0, 1, '2026-05-27 16:53:20', '2026-06-02 06:11:23', 2);
 
 --
 -- ダンプしたテーブルのインデックス
