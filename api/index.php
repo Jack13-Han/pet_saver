@@ -346,6 +346,54 @@ if (preg_match('/^targets\/(\d+)$/', $path, $m) && $method === 'DELETE') {
     successResponse(null, 'Target deleted');
 }
 
+if (preg_match('/^targets\/(\d+)$/', $path, $m) && $method === 'PUT') {
+    $targetId = intval($m[1]);
+    
+    // Check if target exists and belongs to user
+    $stmt = $pdo->prepare("SELECT * FROM targets WHERE id = ? AND user_id = ?");
+    $stmt->execute([$targetId, $userId]);
+    $target = $stmt->fetch();
+    if (!$target) errorResponse('Target not found', 404);
+
+    $name = trim($input['name'] ?? '');
+    $targetAmount = floatval($input['target_amount'] ?? 0);
+    if (empty($name) || $targetAmount <= 0) errorResponse('Name and target amount required');
+
+    $description = $input['description'] ?? '';
+    $category = $input['category'] ?? 'General';
+    $deadline = $input['deadline'] ?? null;
+    if (empty($deadline)) $deadline = null;
+    $avatarType = $input['avatar_type'] ?? 'dog';
+    $avatarName = trim($input['avatar_name'] ?? 'Mochi');
+
+    // Recalculate status based on new target amount and existing current_amount
+    $progress = $targetAmount > 0 ? ($target['current_amount'] / $targetAmount) * 100 : 0;
+    $status = $progress >= 100 ? 'completed' : 'active';
+
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare("UPDATE targets SET name = ?, description = ?, target_amount = ?, category = ?, deadline = ?, avatar_type = ?, avatar_name = ?, status = ? WHERE id = ?");
+        $stmt->execute([$name, $description, $targetAmount, $category, $deadline, $avatarType, $avatarName, $status, $targetId]);
+
+        // Update avatar mood based on new progress
+        $mood = 'neutral';
+        if ($progress >= 100) $mood = 'celebrating';
+        elseif ($progress >= 70) $mood = 'happy';
+        elseif ($progress >= 40) $mood = 'neutral';
+        elseif ($progress > 0) $mood = 'sad';
+        else $mood = 'dirty';
+        
+        $happiness = min(100, max(0, 50 + ($progress - 50)));
+        $pdo->prepare("UPDATE avatars SET mood = ?, happiness = ? WHERE target_id = ?")->execute([$mood, $happiness, $targetId]);
+
+        $pdo->commit();
+        successResponse(null, 'Target updated');
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        errorResponse('Failed to update target', 500);
+    }
+}
+
 if ($path === 'transactions' && $method === 'POST') {
     $targetId = intval($input['target_id'] ?? 0);
     $amount = floatval($input['amount'] ?? 0);

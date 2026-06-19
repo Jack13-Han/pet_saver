@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Trash2, Target } from 'lucide-react'
+import { Plus, Trash2, Target, Pencil } from 'lucide-react'
 import { targets as targetApi } from '../api.js'
 
 const avatarTypes = [
@@ -14,6 +14,7 @@ const avatarTypes = [
 export default function Goals() {
   const [goals, setGoals] = useState([])
   const [showModal, setShowModal] = useState(false)
+  const [editingGoalId, setEditingGoalId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({
     name: '', description: '', target_amount: '', category: 'General',
@@ -30,12 +31,38 @@ export default function Goals() {
     finally { setLoading(false) }
   }
 
-  const handleCreate = async (e) => {
+  const handleEditClick = (goal) => {
+    setForm({
+      name: goal.name,
+      description: goal.description || '',
+      target_amount: goal.target_amount.toString(),
+      category: goal.category || 'General',
+      deadline: goal.deadline || '',
+      avatar_type: goal.avatar_type || 'dog',
+      avatar_name: goal.avatar_name || 'Mochi'
+    })
+    setEditingGoalId(goal.id)
+    setShowModal(true)
+  }
+
+  const handleCloseModal = () => {
+    setShowModal(false)
+    setEditingGoalId(null)
+    setForm({
+      name: '', description: '', target_amount: '', category: 'General',
+      deadline: '', avatar_type: 'dog', avatar_name: 'Mochi'
+    })
+  }
+
+  const handleSave = async (e) => {
     e.preventDefault()
     try {
-      await targetApi.create({ ...form, target_amount: parseFloat(form.target_amount) })
-      setShowModal(false)
-      setForm({ name: '', description: '', target_amount: '', category: 'General', deadline: '', avatar_type: 'dog', avatar_name: 'Mochi' })
+      if (editingGoalId) {
+        await targetApi.update(editingGoalId, { ...form, target_amount: parseFloat(form.target_amount) })
+      } else {
+        await targetApi.create({ ...form, target_amount: parseFloat(form.target_amount) })
+      }
+      handleCloseModal()
       loadGoals()
     } catch (err) { alert(err.message) }
   }
@@ -78,9 +105,14 @@ export default function Goals() {
                     <p style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>{goal.avatar_name} • {goal.category}</p>
                   </div>
                 </div>
-                <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => handleDelete(goal.id)}>
-                  <Trash2 size={18} />
-                </button>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => handleEditClick(goal)}>
+                    <Pencil size={18} />
+                  </button>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => handleDelete(goal.id)}>
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </div>
               <div className="goal-progress-section">
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -113,10 +145,10 @@ export default function Goals() {
         </div>
       )}
 
-      {/* CREATE MODAL */}
+      {/* CREATE/EDIT MODAL */}
       <AnimatePresence>
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-sm p-4 sm:p-0" onClick={() => setShowModal(false)}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-sm p-4 sm:p-0" onClick={handleCloseModal}>
             <motion.div 
               className="bg-white rounded-[28px] shadow-[0_28px_70px_rgba(15,23,42,0.18)] w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] border border-slate-200"
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
@@ -129,13 +161,13 @@ export default function Goals() {
               <div className="border-b border-slate-200 p-6 flex justify-between items-center bg-white shrink-0 relative overflow-hidden">
                 <div className="relative z-10 flex-1 text-center">
                   <h3 className="text-xl font-extrabold tracking-tight text-slate-900 mb-1 flex items-center justify-center gap-2">
-                    <Target className="w-6 h-6 text-emerald-500" /> Create New Goal
+                    <Target className="w-6 h-6 text-emerald-500" /> {editingGoalId ? 'Edit Goal' : 'Create New Goal'}
                   </h3>
-                  <p className="text-slate-500 text-sm font-medium">Set a target and watch your pet grow!</p>
+                  <p className="text-slate-500 text-sm font-medium">{editingGoalId ? 'Update your target and pet details!' : 'Set a target and watch your pet grow!'}</p>
                 </div>
                 <button 
                   className="absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 focus:outline-none" 
-                  onClick={() => setShowModal(false)}
+                  onClick={handleCloseModal}
                 >
                   <Plus className="w-5 h-5 rotate-45" />
                 </button>
@@ -143,7 +175,7 @@ export default function Goals() {
 
               {/* Form Body */}
               <div className="overflow-y-auto flex-1 p-6 sm:p-8 custom-scrollbar">
-                <form id="createGoalForm" onSubmit={handleCreate} className="space-y-6">
+                <form id="createGoalForm" onSubmit={handleSave} className="space-y-6">
                   
                   {/* Goal Basics */}
                   <div className="space-y-5">
@@ -243,7 +275,7 @@ export default function Goals() {
                 <button 
                   type="button" 
                   className="px-6 py-3.5 rounded-2xl font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors"
-                  onClick={() => setShowModal(false)}
+                  onClick={handleCloseModal}
                 >
                   Cancel
                 </button>
@@ -252,7 +284,7 @@ export default function Goals() {
                   form="createGoalForm"
                   className="px-8 py-3.5 rounded-2xl font-bold text-white bg-emerald-500 hover:bg-emerald-600 shadow-[0_8px_16px_rgba(74,222,128,0.25)] transition-all active:scale-95"
                 >
-                  Create Goal ✨
+                  {editingGoalId ? 'Save Changes ✨' : 'Create Goal ✨'}
                 </button>
               </div>
 

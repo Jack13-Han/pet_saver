@@ -90,6 +90,7 @@ export const dashboard = {
 export const targets = {
   list: (status = "active") => api(`targets?status=${status}`),
   create: (data) => api("targets", { method: "POST", body: data }),
+  update: (id, data) => api(`targets/${id}`, { method: "PUT", body: data }),
   delete: (id) => api(`targets/${id}`, { method: "DELETE" }),
 };
 
