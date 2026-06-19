@@ -183,15 +183,16 @@ export default function Dashboard() {
   };
 
   const handleTransaction = async (type, transactionAmount = "") => {
-    if (!transactionAmount || !data?.activeTarget) return;
+    if (!transactionAmount || !data?.activeTarget) return false;
     const numAmount = parseFloat(transactionAmount);
-    if (numAmount <= 0) return;
+    if (numAmount <= 0) return false;
 
     try {
       const res = await txApi.create({
         target_id: data.activeTarget.id,
         amount: numAmount,
         type,
+        category: transactionCategory,
         note: transactionNote ? `${transactionCategory} · ${transactionNote}` : `${transactionCategory} · ${
           type === "deposit" ? "Daily savings" : "Expense deduction"
         }`,
@@ -231,8 +232,10 @@ export default function Dashboard() {
       }
 
       loadDashboard();
+      return true;
     } catch (err) {
       showToast(err.message || "Transaction failed", "error");
+      return false;
     }
   };
 
@@ -259,16 +262,17 @@ export default function Dashboard() {
 
   const submitQuickSave = async (e) => {
     e.preventDefault();
-    await handleTransaction(transactionType, saveAmount.trim());
-    setShowSaveModal(false);
-    setSaveAmount("");
+    const saved = await handleTransaction(transactionType, saveAmount.trim());
+    if (saved) {
+      setShowSaveModal(false);
+      setSaveAmount("");
+      setTransactionNote("");
+    }
   };
 
   const changeGoal = async (goalId) => {
     try {
       await userApi.setActiveTarget(goalId);
-
-      setSelectedGoal(goalId);
 
       await loadDashboard();
 

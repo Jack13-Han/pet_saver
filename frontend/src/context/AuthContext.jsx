@@ -67,8 +67,17 @@ export function AuthProvider({ children }) {
   };
 
   const updateUser = async (updates) => {
-    const res = await userApi.update(updates);
-    const responseData = res.data || res;
+    const serverFields = [
+      "username",
+      "email",
+      "public_profile",
+      "show_on_leaderboard",
+    ];
+    const shouldSyncServer = Object.keys(updates).some((key) =>
+      serverFields.includes(key),
+    );
+    const res = shouldSyncServer ? await userApi.update(updates) : null;
+    const responseData = res ? res.data || res : updates;
     const newUser = { ...user, ...responseData };
     setUser(newUser);
     localStorage.setItem("user", JSON.stringify(newUser));

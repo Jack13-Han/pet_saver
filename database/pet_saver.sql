@@ -103,6 +103,51 @@ CREATE TABLE `activity_log` (
 
 -- --------------------------------------------------------
 
+CREATE TABLE `budgets` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `category` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `monthly_limit` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_user_budget_category` (`user_id`,`category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+CREATE TABLE `recurring_entries` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `target_id` int DEFAULT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `amount` decimal(15,2) NOT NULL,
+  `type` enum('deposit','withdrawal') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `category` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'General',
+  `frequency` enum('weekly','monthly') COLLATE utf8mb4_unicode_ci DEFAULT 'monthly',
+  `next_run_date` date NOT NULL,
+  `last_run_date` date DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `target_id` (`target_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+CREATE TABLE `mission_claims` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `mission_id` varchar(80) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reward_coins` int NOT NULL DEFAULT '0',
+  `claimed_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_user_mission` (`user_id`,`mission_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
 --
 -- テーブルの構造 `avatars`
 --
@@ -209,10 +254,11 @@ INSERT INTO `targets` (`id`, `user_id`, `name`, `description`, `target_amount`, 
 
 CREATE TABLE `transactions` (
   `id` int NOT NULL,
-  `target_id` int NOT NULL,
+  `target_id` int DEFAULT NULL,
   `user_id` int NOT NULL,
   `amount` decimal(15,2) NOT NULL,
   `type` enum('deposit','withdrawal') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `category` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'General',
   `note` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `transaction_date` date NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP

@@ -128,11 +128,29 @@ export const achievements = {
 
 export const receipts = {
   list: () => api("receipts"),
+  scan: (data) => api("receipts/scan", { method: "POST", body: data }),
   create: (data) => api("receipts", { method: "POST", body: data }),
 };
 
 export const rankings = {
   list: () => api("rankings"),
+};
+
+export const budgets = {
+  list: () => api("budgets"),
+  save: (data) => api("budgets", { method: "POST", body: data }),
+};
+
+export const recurring = {
+  list: () => api("recurring"),
+  create: (data) => api("recurring", { method: "POST", body: data }),
+  delete: (id) => api(`recurring/${id}`, { method: "DELETE" }),
+};
+
+export const finance = {
+  overview: () => api("finance/overview"),
+  claimMission: (missionId) =>
+    api("missions/claim", { method: "POST", body: { mission_id: missionId } }),
 };
 
 export default api;
