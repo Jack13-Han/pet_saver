@@ -203,7 +203,7 @@ if ($path === 'dashboard' && $method === 'GET') {
         $activeTarget['accessories'] = json_decode($activeTarget['accessories'] ?? '[]', true);
     }
 
-    $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 10");
+    $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t LEFT JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 10");
     $stmt->execute([$userId]);
     $transactions = $stmt->fetchAll();
 
@@ -455,7 +455,7 @@ if ($path === 'transactions' && $method === 'POST') {
 }
 
 if ($path === 'transactions' && $method === 'GET') {
-    $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 50");
+    $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t LEFT JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 50");
     $stmt->execute([$userId]);
     successResponse($stmt->fetchAll());
 }
@@ -624,21 +624,24 @@ if ($path === 'receipts' && $method === 'POST') {
     $targetId = intval($input['target_id'] ?? 0);
     $totalPrice = floatval($input['total_price'] ?? 0);
     $pdo->prepare("INSERT INTO receipts (user_id, image_path, shop_name, total_price, receipt_date, category, items, target_id, is_processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)")
-        ->execute([$userId, $input['image_path'] ?? null, trim($input['shop_name'] ?? ''), $totalPrice, $input['date'] ?? date('Y-m-d'), $input['category'] ?? 'Shopping', json_encode($input['items'] ?? []), $targetId]);
+        ->execute([$userId, $input['image_path'] ?? null, trim($input['shop_name'] ?? ''), $totalPrice, $input['date'] ?? date('Y-m-d'), $input['category'] ?? 'Shopping', json_encode($input['items'] ?? []), $targetId ?: null]);
     $receiptId = $pdo->lastInsertId();
 
-    if ($targetId && $totalPrice > 0) {
+    if ($totalPrice > 0) {
         $receiptCategory = trim($input['category'] ?? 'Shopping');
-        $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, category, note, transaction_date) VALUES (?, ?, ?, 'deposit', ?, ?, ?)")
-            ->execute([$targetId, $userId, $totalPrice, $receiptCategory, "Receipt: " . ($input['shop_name'] ?? ''), $input['date'] ?? date('Y-m-d')]);
-        $stmt = $pdo->prepare("SELECT * FROM targets WHERE id = ?");
-        $stmt->execute([$targetId]);
-        $target = $stmt->fetch();
-        if ($target) {
-            $newAmount = $target['current_amount'] + $totalPrice;
-            $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
-            $status = $progress >= 100 ? 'completed' : 'active';
-            $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$newAmount, $status, $targetId]);
+        $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, category, note, transaction_date) VALUES (?, ?, ?, 'withdrawal', ?, ?, ?)")
+            ->execute([$targetId ?: null, $userId, $totalPrice, $receiptCategory, "Receipt: " . ($input['shop_name'] ?? ''), $input['date'] ?? date('Y-m-d')]);
+        
+        if ($targetId) {
+            $stmt = $pdo->prepare("SELECT * FROM targets WHERE id = ?");
+            $stmt->execute([$targetId]);
+            $target = $stmt->fetch();
+            if ($target) {
+                $newAmount = max(0, $target['current_amount'] - $totalPrice);
+                $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
+                $status = $progress >= 100 ? 'completed' : 'active';
+                $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$newAmount, $status, $targetId]);
+            }
         }
     }
     $pdo->prepare("UPDATE achievements SET progress = progress + 1 WHERE user_id = ? AND title = 'Receipt Pro'")->execute([$userId]);

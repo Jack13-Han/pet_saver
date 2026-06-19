@@ -54,7 +54,7 @@ CREATE TABLE
 CREATE TABLE
     transactions (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        target_id INT NOT NULL,
+        target_id INT,
         user_id INT NOT NULL,
         amount DECIMAL(15, 2) NOT NULL,
         type ENUM ('deposit', 'withdrawal') NOT NULL,
