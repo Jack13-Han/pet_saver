@@ -12,6 +12,8 @@ import Achievements from './pages/Achievements.jsx'
 import ReceiptScanner from './pages/ReceiptScanner.jsx'
 import Rankings from './pages/Rankings.jsx'
 import Settings from './pages/Settings.jsx'
+import Insights from './pages/Insights.jsx'
+import ExpenseAnalyst from './pages/ExpenseAnalyst.jsx'
 
 function App() {
   const { user, loading } = useAuth()
@@ -38,7 +40,7 @@ function App() {
       )}
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <main className="main-content">
-        <div className="lg:hidden flex items-center justify-between mb-6 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+        <div className="mobile-header lg:hidden">
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 -ml-2 rounded-xl hover:bg-slate-100 text-slate-600">
             <Menu size={24} />
           </button>
@@ -51,6 +53,8 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/goals" element={<Goals />} />
           <Route path="/transactions" element={<Transactions />} />
+          <Route path="/insights" element={<Insights />} />
+          <Route path="/expense-analyst" element={<ExpenseAnalyst />} />
           <Route path="/shop" element={<Shop />} />
           <Route path="/achievements" element={<Achievements />} />
           <Route path="/scanner" element={<ReceiptScanner />} />

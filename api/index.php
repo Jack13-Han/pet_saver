@@ -1,22 +1,16 @@
 <?php
 
-$allowedOrigins = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-];
-
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-
-if (in_array($origin, $allowedOrigins, true)) {
+if (!empty($origin)) {
     header("Access-Control-Allow-Origin: $origin");
 } else {
-    header("Access-Control-Allow-Origin: http://localhost:3000");
+    header("Access-Control-Allow-Origin: *");
 }
 
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 
-// ၂။ Browser ရဲ့ ရှေ့ပြေး စစ်ဆေးမှု (Preflight Options Check) ကို အောင်မြင်ကြောင်း ပြန်ပြောရန်
+// 2. Handle preflight OPTIONS request for CORS
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header("HTTP/1.1 200 OK");
     exit();
@@ -25,8 +19,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 ini_set('display_errors', 0);
 ini_set('display_startup_errors', 0);
-ini_set('log_errors', 1);
 error_reporting(E_ALL);
+
+// Convert PHP errors/warnings into ErrorExceptions
+set_error_handler(function($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) {
+        return;
+    }
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+
+// Catch all uncaught exceptions and output as JSON
+set_exception_handler(function($exception) {
+    header('Content-Type: application/json; charset=UTF-8');
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'error' => $exception->getMessage(),
+        'file' => basename($exception->getFile()),
+        'line' => $exception->getLine()
+    ]);
+    exit();
+});
+
 
 require_once 'config.php';
 
@@ -99,10 +114,13 @@ set_exception_handler(function (Throwable $e) use ($pdo) {
     exit();
 });
 
+ensureUserPrivacyColumns($pdo);
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 $path = $_GET['route'] ?? '';
 $path = trim($path, '/');
+
 
 $input = json_decode(file_get_contents('php://input'), true);
 
@@ -196,9 +214,83 @@ if ($userId) {
 }
 
 if ($path === 'user' && $method === 'GET') {
-    $stmt = $pdo->prepare("SELECT id, username, email, coins, rank, streak_days, total_saved, total_targets_completed FROM users WHERE id = ?");
+    $stmt = $pdo->prepare("
+    SELECT
+        id,
+        username,
+        email,
+        coins,
+        `rank`,
+        streak_days,
+        total_saved,
+        total_targets_completed,
+        COALESCE(public_profile, 0) AS public_profile,
+        COALESCE(show_on_leaderboard, 1) AS show_on_leaderboard
+    FROM users
+    WHERE id = ?
+    ");
     $stmt->execute([$userId]);
     successResponse($stmt->fetch());
+}
+
+if ($path === 'user' && $method === 'PUT') {
+    $updates = [];
+    $params = [];
+
+    if (array_key_exists('username', $input)) {
+        $username = trim($input['username'] ?? '');
+        if (strlen($username) < 3) {
+            errorResponse('Username min 3 chars');
+        }
+        $updates[] = 'username = ?';
+        $params[] = $username;
+    }
+
+    if (array_key_exists('email', $input)) {
+        $email = trim($input['email'] ?? '');
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            errorResponse('Invalid email');
+        }
+        $updates[] = 'email = ?';
+        $params[] = $email;
+    }
+
+    if (array_key_exists('public_profile', $input)) {
+        $updates[] = 'public_profile = ?';
+        $params[] = !empty($input['public_profile']) ? 1 : 0;
+    }
+
+    if (array_key_exists('show_on_leaderboard', $input)) {
+        $updates[] = 'show_on_leaderboard = ?';
+        $params[] = !empty($input['show_on_leaderboard']) ? 1 : 0;
+    }
+
+    if (!$updates) {
+        errorResponse('No updates provided');
+    }
+
+    $params[] = $userId;
+    $stmt = $pdo->prepare('UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = ?');
+    $stmt->execute($params);
+
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            username,
+            email,
+            coins,
+            `rank`,
+            streak_days,
+            total_saved,
+            total_targets_completed,
+            COALESCE(public_profile, 0) AS public_profile,
+            COALESCE(show_on_leaderboard, 1) AS show_on_leaderboard
+        FROM users
+        WHERE id = ?
+    ");
+    $stmt->execute([$userId]);
+
+    successResponse($stmt->fetch(), 'Settings updated');
 }
 
 if ($path === 'user/active-target' && $method === 'POST') {
@@ -246,7 +338,7 @@ if ($path === 'dashboard' && $method === 'GET') {
         a.mood, a.accessories
     FROM targets t
     LEFT JOIN avatars a ON t.id = a.target_id
-    WHERE t.user_id = ? AND t.status = 'active'
+    WHERE t.user_id = ?
     ORDER BY t.created_at DESC LIMIT 1
     ");
     $stmt->execute([$userId]);
@@ -262,7 +354,7 @@ if ($path === 'dashboard' && $method === 'GET') {
         $activeTarget['care_actions_remaining'] = max(0, CARE_DAILY_LIMIT - $careActionsToday);
     }
 
-    $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 10");
+    $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t LEFT JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 10");
     $stmt->execute([$userId]);
     $transactions = $stmt->fetchAll();
 
@@ -282,8 +374,13 @@ if ($path === 'dashboard' && $method === 'GET') {
 
 if ($path === 'targets' && $method === 'GET') {
     $status = $_GET['status'] ?? 'active';
-    $stmt = $pdo->prepare("SELECT t.*, a.happiness, a.energy, a.fullness, a.cleanliness, a.level, a.mood FROM targets t LEFT JOIN avatars a ON t.id = a.target_id WHERE t.user_id = ? AND t.status = ? ORDER BY t.created_at DESC");
-    $stmt->execute([$userId, $status]);
+    if ($status === 'all') {
+        $stmt = $pdo->prepare("SELECT t.*, a.happiness, a.energy, a.fullness, a.cleanliness, a.level, a.mood FROM targets t LEFT JOIN avatars a ON t.id = a.target_id WHERE t.user_id = ? ORDER BY t.created_at DESC");
+        $stmt->execute([$userId]);
+    } else {
+        $stmt = $pdo->prepare("SELECT t.*, a.happiness, a.energy, a.fullness, a.cleanliness, a.level, a.mood FROM targets t LEFT JOIN avatars a ON t.id = a.target_id WHERE t.user_id = ? AND t.status = ? ORDER BY t.created_at DESC");
+        $stmt->execute([$userId, $status]);
+    }
     $targets = $stmt->fetchAll();
     foreach ($targets as &$t) {
         $t['progress'] = $t['target_amount'] > 0 ? round(($t['current_amount'] / $t['target_amount']) * 100, 1) : 0;
@@ -379,6 +476,40 @@ if ($path === 'targets' && $method === 'POST') {
 
         $pdo->prepare("INSERT INTO avatars (target_id) VALUES (?)")->execute([$targetId]);
 
+        // ROLLOVER LOGIC: Move excess savings from previous targets to this new target
+        $stmt = $pdo->prepare("SELECT id, current_amount, target_amount FROM targets WHERE user_id = ? AND current_amount > target_amount AND id != ?");
+        $stmt->execute([$userId, $targetId]);
+        $excessTargets = $stmt->fetchAll();
+
+        $totalExcess = 0;
+        foreach ($excessTargets as $et) {
+            $excess = $et['current_amount'] - $et['target_amount'];
+            $totalExcess += $excess;
+            // Cap the old target to its target_amount
+            $pdo->prepare("UPDATE targets SET current_amount = target_amount WHERE id = ?")->execute([$et['id']]);
+            // Record a withdrawal for the deduction to balance ledger
+            $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, 'withdrawal', 'Rollover to new goal', NOW())")->execute([$et['id'], $userId, $excess]);
+        }
+
+        if ($totalExcess > 0) {
+            // Apply excess to the new target
+            $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, 'deposit', 'Rollover from previous goal', NOW())")->execute([$targetId, $userId, $totalExcess]);
+            
+            $progress = ($totalExcess / $targetAmount) * 100;
+            $status = $progress >= 100 ? 'completed' : 'active';
+            $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$totalExcess, $status, $targetId]);
+            
+            // update avatar mood
+            $mood = 'neutral';
+            if ($progress >= 100) $mood = 'celebrating';
+            elseif ($progress >= 70) $mood = 'happy';
+            elseif ($progress >= 40) $mood = 'neutral';
+            elseif ($progress > 0) $mood = 'sad';
+            else $mood = 'dirty';
+            $happiness = min(100, max(0, 50 + ($progress - 50)));
+            $pdo->prepare("UPDATE avatars SET mood = ?, happiness = ? WHERE target_id = ?")->execute([$mood, $happiness, $targetId]);
+        }
+
         $pdo->commit();
         successResponse(['target_id' => $targetId], 'Target created');
     } catch (Throwable $e) {
@@ -399,6 +530,54 @@ if (preg_match('/^targets\/(\d+)$/', $path, $m) && $method === 'DELETE') {
     successResponse(null, 'Target deleted');
 }
 
+if (preg_match('/^targets\/(\d+)$/', $path, $m) && $method === 'PUT') {
+    $targetId = intval($m[1]);
+    
+    // Check if target exists and belongs to user
+    $stmt = $pdo->prepare("SELECT * FROM targets WHERE id = ? AND user_id = ?");
+    $stmt->execute([$targetId, $userId]);
+    $target = $stmt->fetch();
+    if (!$target) errorResponse('Target not found', 404);
+
+    $name = trim($input['name'] ?? '');
+    $targetAmount = floatval($input['target_amount'] ?? 0);
+    if (empty($name) || $targetAmount <= 0) errorResponse('Name and target amount required');
+
+    $description = $input['description'] ?? '';
+    $category = $input['category'] ?? 'General';
+    $deadline = $input['deadline'] ?? null;
+    if (empty($deadline)) $deadline = null;
+    $avatarType = $input['avatar_type'] ?? 'dog';
+    $avatarName = trim($input['avatar_name'] ?? 'Mochi');
+
+    // Recalculate status based on new target amount and existing current_amount
+    $progress = $targetAmount > 0 ? ($target['current_amount'] / $targetAmount) * 100 : 0;
+    $status = $progress >= 100 ? 'completed' : 'active';
+
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare("UPDATE targets SET name = ?, description = ?, target_amount = ?, category = ?, deadline = ?, avatar_type = ?, avatar_name = ?, status = ? WHERE id = ?");
+        $stmt->execute([$name, $description, $targetAmount, $category, $deadline, $avatarType, $avatarName, $status, $targetId]);
+
+        // Update avatar mood based on new progress
+        $mood = 'neutral';
+        if ($progress >= 100) $mood = 'celebrating';
+        elseif ($progress >= 70) $mood = 'happy';
+        elseif ($progress >= 40) $mood = 'neutral';
+        elseif ($progress > 0) $mood = 'sad';
+        else $mood = 'dirty';
+        
+        $happiness = min(100, max(0, 50 + ($progress - 50)));
+        $pdo->prepare("UPDATE avatars SET mood = ?, happiness = ? WHERE target_id = ?")->execute([$mood, $happiness, $targetId]);
+
+        $pdo->commit();
+        successResponse(null, 'Target updated');
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        errorResponse('Failed to update target', 500);
+    }
+}
+
 if ($path === 'transactions' && $method === 'POST') {
     $targetId = intval($input['target_id'] ?? 0);
     $amountInput = $input['amount'] ?? null;
@@ -414,23 +593,20 @@ if ($path === 'transactions' && $method === 'POST') {
     $target = $stmt->fetch();
     if (!$target) errorResponse('Target not found');
 
-    if ($type === 'deposit' && ((float)$target['current_amount'] + $amount) > MAX_MONEY_AMOUNT) {
-        errorResponse('Amount is too large for this goal');
-    }
-
-    if ($type === 'deposit') {
-        $stmt = $pdo->prepare("SELECT total_saved FROM users WHERE id = ?");
-        $stmt->execute([$userId]);
-        $totalSaved = (float)$stmt->fetchColumn();
-        if (($totalSaved + $amount) > MAX_MONEY_AMOUNT) {
-            errorResponse('Amount is too large for your account totals');
+    // Extract category if explicitly passed, else try to parse from note, or fallback to General
+    $category = trim($input['category'] ?? '');
+    if (empty($category) && !empty($input['note'])) {
+        if (strpos($input['note'], ' · ') !== false) {
+            $parts = explode(' · ', $input['note']);
+            $category = trim($parts[0]);
         }
     }
+    if (empty($category)) {
+        $category = 'General';
+    }
 
-    $pdo->beginTransaction();
-
-    $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, ?, ?, ?)")
-        ->execute([$targetId, $userId, $amount, $type, $input['note'] ?? '', $input['date'] ?? date('Y-m-d')]);
+    $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, category, note, transaction_date) VALUES (?, ?, ?, ?, ?, ?, ?)")
+        ->execute([$targetId, $userId, $amount, $type, $category, $input['note'] ?? '', $input['date'] ?? date('Y-m-d')]);
 
     if ($type === 'deposit') {
         $newAmount = $target['current_amount'] + $amount;
@@ -472,9 +648,57 @@ if ($path === 'transactions' && $method === 'POST') {
 }
 
 if ($path === 'transactions' && $method === 'GET') {
-    $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 50");
+    $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t LEFT JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 50");
     $stmt->execute([$userId]);
     successResponse($stmt->fetchAll());
+}
+
+if ($path === 'transactions/insights' && $method === 'GET') {
+    // 1. Get total spending (withdrawals) grouped by category
+    $stmt = $pdo->prepare("
+        SELECT category, SUM(amount) as total
+        FROM transactions
+        WHERE user_id = ? AND type = 'withdrawal'
+        GROUP BY category
+        ORDER BY total DESC
+    ");
+    $stmt->execute([$userId]);
+    $categories = $stmt->fetchAll();
+
+    // 2. Get total savings (deposits) vs total spending (withdrawals)
+    $stmt = $pdo->prepare("
+        SELECT 
+            SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END) as total_savings,
+            SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END) as total_spending
+        FROM transactions
+        WHERE user_id = ?
+    ");
+    $stmt->execute([$userId]);
+    $totals = $stmt->fetch();
+
+    // 3. Get recent 6 months spending history by month for monthly comparison
+    $stmt = $pdo->prepare("
+        SELECT 
+            DATE_FORMAT(transaction_date, '%Y-%m') as raw_month,
+            DATE_FORMAT(transaction_date, '%b %Y') as month_year,
+            SUM(amount) as total
+        FROM transactions
+        WHERE user_id = ? AND type = 'withdrawal'
+        GROUP BY raw_month, month_year
+        ORDER BY raw_month ASC
+        LIMIT 6
+    ");
+    $stmt->execute([$userId]);
+    $monthlyTrend = $stmt->fetchAll();
+
+    successResponse([
+        'categories' => $categories,
+        'totals' => [
+            'savings' => floatval($totals['total_savings'] ?? 0),
+            'spending' => floatval($totals['total_spending'] ?? 0),
+        ],
+        'monthlyTrend' => $monthlyTrend
+    ]);
 }
 
 //calendar
@@ -629,26 +853,22 @@ if ($path === 'receipts' && $method === 'POST') {
         errorResponse('Receipt total is too large');
     }
     $pdo->prepare("INSERT INTO receipts (user_id, image_path, shop_name, total_price, receipt_date, category, items, target_id, is_processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)")
-        ->execute([$userId, $input['image_path'] ?? null, trim($input['shop_name'] ?? ''), $totalPrice, $input['date'] ?? date('Y-m-d'), $input['category'] ?? 'Shopping', json_encode($input['items'] ?? []), $targetId]);
+        ->execute([$userId, $input['image_path'] ?? null, trim($input['shop_name'] ?? ''), $totalPrice, $input['date'] ?? date('Y-m-d'), $input['category'] ?? 'Shopping', json_encode($input['items'] ?? []), $targetId ?: null]);
     $receiptId = $pdo->lastInsertId();
 
-    if ($targetId && $totalPrice > 0) {
-        $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, 'deposit', ?, ?)")
-            ->execute([$targetId, $userId, $totalPrice, "Receipt: " . ($input['shop_name'] ?? ''), $input['date'] ?? date('Y-m-d')]);
-        $stmt = $pdo->prepare("SELECT * FROM targets WHERE id = ?");
-        $stmt->execute([$targetId]);
-        $target = $stmt->fetch();
-        if ($target) {
-            if (((float)$target['current_amount'] + $totalPrice) > MAX_MONEY_AMOUNT) {
-                errorResponse('Receipt total is too large for this goal');
-            }
-            $newAmount = $target['current_amount'] + $totalPrice;
-            $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
-            $status = $progress >= 100 ? 'completed' : 'active';
-            if ($status === 'completed') {
-                $pdo->prepare("UPDATE targets SET current_amount = ?, status = ?, completion_date = COALESCE(completion_date, NOW()) WHERE id = ?")->execute([$newAmount, $status, $targetId]);
-                $pdo->prepare("UPDATE users SET active_target_id = NULL WHERE id = ? AND active_target_id = ?")->execute([$userId, $targetId]);
-            } else {
+    if ($totalPrice > 0) {
+        $receiptCategory = trim($input['category'] ?? 'Shopping');
+        $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, category, note, transaction_date) VALUES (?, ?, ?, 'withdrawal', ?, ?, ?)")
+            ->execute([$targetId ?: null, $userId, $totalPrice, $receiptCategory, "Receipt: " . ($input['shop_name'] ?? ''), $input['date'] ?? date('Y-m-d')]);
+        
+        if ($targetId) {
+            $stmt = $pdo->prepare("SELECT * FROM targets WHERE id = ?");
+            $stmt->execute([$targetId]);
+            $target = $stmt->fetch();
+            if ($target) {
+                $newAmount = max(0, $target['current_amount'] - $totalPrice);
+                $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
+                $status = $progress >= 100 ? 'completed' : 'active';
                 $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$newAmount, $status, $targetId]);
             }
         }
@@ -667,7 +887,7 @@ if ($path === 'receipts' && $method === 'GET') {
 }
 
 if ($path === 'rankings' && $method === 'GET') {
-    $stmt = $pdo->query("SELECT id, username, rank, total_targets_completed, total_saved, coins, CASE WHEN rank = 'Platinum' THEN 5 WHEN rank = 'Diamond' THEN 4 WHEN rank = 'Gold' THEN 3 WHEN rank = 'Silver' THEN 2 ELSE 1 END as rank_value FROM users ORDER BY rank_value DESC, total_targets_completed DESC, total_saved DESC LIMIT 50");
+    $stmt = $pdo->query("SELECT id, username, `rank`, total_targets_completed, total_saved, coins, CASE WHEN `rank` = 'Platinum' THEN 5 WHEN `rank` = 'Diamond' THEN 4 WHEN `rank` = 'Gold' THEN 3 WHEN `rank` = 'Silver' THEN 2 ELSE 1 END as rank_value FROM users WHERE COALESCE(show_on_leaderboard, 1) = 1 ORDER BY rank_value DESC, total_targets_completed DESC, total_saved DESC LIMIT 50");
     successResponse($stmt->fetchAll());
 }
 
@@ -757,6 +977,23 @@ function ensureAvatarShopItems($pdo)
     }
 }
 
+function ensureUserPrivacyColumns($pdo)
+{
+    try {
+        $pdo->query("SELECT public_profile, show_on_leaderboard FROM users LIMIT 1");
+    } catch (PDOException $e) {
+        try {
+            $pdo->exec("ALTER TABLE users ADD COLUMN public_profile TINYINT(1) NOT NULL DEFAULT 0");
+        } catch (PDOException $ignored) {
+        }
+
+        try {
+            $pdo->exec("ALTER TABLE users ADD COLUMN show_on_leaderboard TINYINT(1) NOT NULL DEFAULT 1");
+        } catch (PDOException $ignored) {
+        }
+    }
+}
+
 function normalizeShopItems($items, $owned = [])
 {
     $ownedIds = array_map('intval', $owned);
@@ -785,7 +1022,6 @@ function ensureCareActivityType($pdo)
         // Existing compatible databases need no migration.
     }
 }
-
 function checkAchievements($pdo, $userId)
 {
 

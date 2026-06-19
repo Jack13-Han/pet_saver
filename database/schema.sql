@@ -1,16 +1,5 @@
 -- Pet Saver Database Schema
 -- Run: mysql -u root -p < schema.sql
-CREATE DATABASE IF NOT EXISTS pet_saver CHARACTER
-SET
-    utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-USE pet_saver;
-
-CREATE DATABASE IF NOT EXISTS pet_saver CHARACTER
-SET
-    utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-USE pet_saver;
 
 CREATE TABLE
     users (
@@ -24,6 +13,8 @@ CREATE TABLE
         last_active DATE DEFAULT NULL,
         total_saved DECIMAL(15, 2) DEFAULT 0,
         total_targets_completed INT DEFAULT 0,
+        public_profile BOOLEAN DEFAULT FALSE,
+        show_on_leaderboard BOOLEAN DEFAULT TRUE,
         active_target_id INT DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -76,10 +67,11 @@ CREATE TABLE
 CREATE TABLE
     transactions (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        target_id INT NOT NULL,
+        target_id INT,
         user_id INT NOT NULL,
         amount DECIMAL(15, 2) NOT NULL,
         type ENUM ('deposit', 'withdrawal') NOT NULL,
+        category VARCHAR(50) DEFAULT 'General',
         note VARCHAR(255),
         transaction_date DATE NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -142,7 +134,7 @@ CREATE TABLE
     receipts (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
-        image_path VARCHAR(255),
+        image_path LONGTEXT,
         shop_name VARCHAR(100),
         total_price DECIMAL(15, 2),
         receipt_date DATE,

@@ -1,16 +1,10 @@
 <?php
 
-$allowedOrigins = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-];
-
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-
-if (in_array($origin, $allowedOrigins, true)) {
+if (!empty($origin)) {
     header("Access-Control-Allow-Origin: $origin");
 } else {
-    header("Access-Control-Allow-Origin: http://localhost:3000");
+    header("Access-Control-Allow-Origin: *");
 }
 
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
@@ -76,6 +70,7 @@ try {
         ";charset=utf8mb4";
 
     $pdo = new PDO($dsn, DB_USER, DB_PASS);
+    $pdo->exec("SET NAMES utf8mb4");
 
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
@@ -88,6 +83,10 @@ try {
     ]);
 
     exit();
+}
+
+if (!defined('JWT_SECRET')) {
+    define('JWT_SECRET', 'pet_saver_secret_key_change_me');
 }
 
 function generateJWT($userId, $username)

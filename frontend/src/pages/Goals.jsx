@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Trash2, Target, Lock, X } from 'lucide-react'
+import { Plus, Trash2, Target, Pencil, Lock, X } from 'lucide-react'
 import { shop as shopApi, targets as targetApi } from '../api.js'
 import { avatarTypes } from '../petAssets.js'
 
 export default function Goals() {
   const [goals, setGoals] = useState([])
   const [showModal, setShowModal] = useState(false)
+  const [editingGoalId, setEditingGoalId] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [loading, setLoading] = useState(true)
   const [avatarShopItems, setAvatarShopItems] = useState([])
@@ -36,7 +37,30 @@ export default function Goals() {
     finally { setLoading(false) }
   }
 
-  const handleCreate = async (e) => {
+  const handleEditClick = (goal) => {
+    setForm({
+      name: goal.name,
+      description: goal.description || '',
+      target_amount: goal.target_amount.toString(),
+      category: goal.category || 'General',
+      deadline: goal.deadline || '',
+      avatar_type: goal.avatar_type || 'dog',
+      avatar_name: goal.avatar_name || 'Mochi'
+    })
+    setEditingGoalId(goal.id)
+    setShowModal(true)
+  }
+
+  const handleCloseModal = () => {
+    setShowModal(false)
+    setEditingGoalId(null)
+    setForm({
+      name: '', description: '', target_amount: '', category: 'General',
+      deadline: '', avatar_type: 'dog', avatar_name: 'Mochi'
+    })
+  }
+
+  const handleSave = async (e) => {
     e.preventDefault()
     const category = form.category === 'Custom' ? customCategory.trim() : form.category
     if (!category) {
@@ -49,9 +73,13 @@ export default function Goals() {
       return
     }
     try {
-      await targetApi.create({ ...form, category, target_amount: parseFloat(form.target_amount) })
-      setShowModal(false)
-      setForm({ name: '', description: '', target_amount: '', category: 'General', deadline: '', avatar_type: 'dog', avatar_name: 'Mochi' })
+      const finalForm = { ...form, category, target_amount: parseFloat(form.target_amount) }
+      if (editingGoalId) {
+        await targetApi.update(editingGoalId, finalForm)
+      } else {
+        await targetApi.create(finalForm)
+      }
+      handleCloseModal()
       setCustomCategory('')
       loadGoals()
     } catch (err) { alert(err.message) }
@@ -103,9 +131,14 @@ export default function Goals() {
                     <p style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>{goal.avatar_name} • {goal.category}</p>
                   </div>
                 </div>
-                <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setDeleteTarget(goal)} aria-label={`Delete ${goal.name}`}>
-                  <Trash2 size={18} />
-                </button>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => handleEditClick(goal)} aria-label={`Edit ${goal.name}`}>
+                    <Pencil size={18} />
+                  </button>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setDeleteTarget(goal)} aria-label={`Delete ${goal.name}`}>
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </div>
               <div className="goal-progress-section">
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -163,78 +196,178 @@ export default function Goals() {
         )}
       </AnimatePresence>
 
-      {/* CREATE MODAL */}
+      {/* CREATE/EDIT MODAL */}
       <AnimatePresence>
         {showModal && (
-          <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)}>
-            <motion.div className="modal-content" initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} onClick={e => e.stopPropagation()}>
-              <div className="modal-header">
-                <h3 className="modal-title">Create New Goal</h3>
-                <button className="modal-close" onClick={() => setShowModal(false)}>✕</button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-sm p-4 sm:p-0" onClick={handleCloseModal}>
+            <motion.div 
+              className="bg-white rounded-[28px] shadow-[0_28px_70px_rgba(15,23,42,0.18)] w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] border border-slate-200"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+              animate={{ opacity: 1, scale: 1, y: 0 }} 
+              exit={{ opacity: 0, scale: 0.95, y: 20 }} 
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="border-b border-slate-200 p-6 flex justify-between items-center bg-white shrink-0 relative overflow-hidden">
+                <div className="relative z-10 flex-1 text-center">
+                  <h3 className="text-xl font-extrabold tracking-tight text-slate-900 mb-1 flex items-center justify-center gap-2">
+                    <Target className="w-6 h-6 text-emerald-500" /> {editingGoalId ? 'Edit Goal' : 'Create New Goal'}
+                  </h3>
+                  <p className="text-slate-500 text-sm font-medium">{editingGoalId ? 'Update your target and pet details!' : 'Set a target and watch your pet grow!'}</p>
+                </div>
+                <button 
+                  className="absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 focus:outline-none" 
+                  onClick={handleCloseModal}
+                >
+                  <Plus className="w-5 h-5 rotate-45" />
+                </button>
               </div>
-              <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div className="form-group">
-                  <label>Goal Name</label>
-                  <input className="form-input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. New Nintendo Switch" required />
-                </div>
-                <div className="form-group">
-                  <label>Target Amount (¥)</label>
-                  <input className="form-input" type="number" value={form.target_amount} onChange={e => setForm({...form, target_amount: e.target.value})} placeholder="35000" required />
-                </div>
-                <div className="form-group">
-                  <label>Category</label>
-                  <select className="form-input" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
-                    <option>General</option><option>Education</option><option>Electronics</option><option>Travel</option><option>Emergency</option><option>Custom</option>
-                  </select>
-                  {form.category === 'Custom' && (
-                    <input
-                      className="form-input"
-                      value={customCategory}
-                      onChange={e => setCustomCategory(e.target.value)}
-                      placeholder="Enter your category"
-                      maxLength={50}
-                      required
-                    />
-                  )}
-                </div>
-                <div className="form-group">
-                  <label>Deadline (Optional)</label>
-                  <input className="form-input" type="date" value={form.deadline} onChange={e => setForm({...form, deadline: e.target.value})} />
-                </div>
-                <div className="form-group">
-                  <label>Choose Avatar</label>
-                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    {avatarTypes.map(type => {
-                      const unlocked = isAvatarUnlocked(type)
-                      const shopItem = avatarShopMap[type.id]
-                      return (
-                        <button key={type.id} type="button" onClick={() => unlocked && setForm({...form, avatar_type: type.id})}
-                          className="avatar-choice"
-                          style={{
-                            padding: 12, borderRadius: 'var(--radius-md)',
-                            border: form.avatar_type === type.id ? '3px solid var(--accent-green)' : '2px solid var(--border-color)',
-                            background: form.avatar_type === type.id ? 'var(--accent-green-light)' : 'white',
-                            cursor: unlocked ? 'pointer' : 'not-allowed', fontSize: 28, transition: 'all 0.2s',
-                            opacity: unlocked ? 1 : 0.58, position: 'relative', minWidth: 88
-                          }}
-                          aria-disabled={!unlocked}>
-                          {!unlocked && <span className="avatar-lock-badge"><Lock size={14} /></span>}
-                          {type.emoji}
-                          <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>{type.name}</div>
-                          {!unlocked && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginTop: 2 }}>{shopItem ? `${shopItem.price} coins` : 'Locked'}</div>}
-                        </button>
-                      )
-                    })}
+              {/* Form Body */}
+              <div className="overflow-y-auto flex-1 p-6 sm:p-8 custom-scrollbar">
+                <form id="createGoalForm" onSubmit={handleSave} className="space-y-6">
+                  
+                  {/* Goal Basics */}
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-500 block">What are you saving for? ✨</label>
+                      <input 
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all outline-none text-slate-900 font-bold placeholder:font-normal placeholder:text-slate-400" 
+                        value={form.name} 
+                        onChange={e => setForm({...form, name: e.target.value})} 
+                        placeholder="e.g. New Nintendo Switch" 
+                        required 
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-500 block">Target Amount 💰</label>
+                        <div className="relative flex items-center border-b-2 border-emerald-500 pb-2">
+                          <span className="text-xl font-bold text-slate-400 mr-2">¥</span>
+                          <input 
+                            className="w-full border-0 bg-transparent text-xl font-bold text-slate-900 outline-none placeholder:text-slate-400" 
+                            type="number" 
+                            value={form.target_amount} 
+                            onChange={e => setForm({...form, target_amount: e.target.value})} 
+                            placeholder="35000" 
+                            min="1"
+                            required 
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-500 block">Category 📁</label>
+                        <select 
+                          className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all outline-none text-slate-900 font-bold appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2310b981%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:0.8rem_auto]" 
+                          value={form.category} 
+                          onChange={e => setForm({...form, category: e.target.value})}
+                        >
+                          <option>General</option><option>Education</option><option>Electronics</option><option>Travel</option><option>Emergency</option><option>Custom</option>
+                        </select>
+                        {form.category === 'Custom' && (
+                          <input
+                            className="w-full px-4 py-3 mt-2 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all outline-none text-slate-900 font-bold placeholder:font-normal placeholder:text-slate-400"
+                            value={customCategory}
+                            onChange={e => setCustomCategory(e.target.value)}
+                            placeholder="Enter custom category"
+                            maxLength={50}
+                            required
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-500 block">Deadline ⏰ (Optional)</label>
+                      <input 
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all outline-none text-slate-900 font-bold" 
+                        type="date" 
+                        value={form.deadline} 
+                        onChange={e => setForm({...form, deadline: e.target.value})} 
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="form-group">
-                  <label>Avatar Name</label>
-                  <input className="form-input" value={form.avatar_name} onChange={e => setForm({...form, avatar_name: e.target.value})} placeholder="Mochi" />
-                </div>
-                <button type="submit" className="btn btn-primary" style={{ marginTop: 8 }}>Create Goal</button>
-              </form>
+
+                  <hr className="border-slate-100" />
+
+                  {/* Pet Selection */}
+                  <div className="space-y-5">
+                    <div className="space-y-3">
+                      <label className="text-sm font-bold text-slate-500 block">Choose Your Companion 🐾</label>
+                      <div className="grid grid-cols-5 gap-3">
+                        {avatarTypes.map(type => {
+                          const unlocked = isAvatarUnlocked(type)
+                          const shopItem = avatarShopMap[type.id]
+                          const isSelected = form.avatar_type === type.id
+                          return (
+                            <button 
+                              key={type.id} 
+                              type="button" 
+                              onClick={() => unlocked && setForm({...form, avatar_type: type.id})}
+                              disabled={!unlocked}
+                              className={`relative flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-300 ${
+                                !unlocked 
+                                  ? 'border-slate-100 bg-slate-50/50 opacity-60 cursor-not-allowed'
+                                  : isSelected
+                                    ? 'border-emerald-500 bg-emerald-50 shadow-sm scale-105' 
+                                    : 'border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50'
+                              }`}
+                            >
+                              {!unlocked && (
+                                <span className="absolute top-1.5 right-1.5 p-0.5 bg-slate-200 rounded-full text-slate-500">
+                                  <Lock size={10} />
+                                </span>
+                              )}
+                              <span className="text-3xl mb-1 filter drop-shadow-sm">{type.emoji}</span>
+                              <span className={`text-xs font-bold ${isSelected ? 'text-emerald-700' : unlocked ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {type.name}
+                              </span>
+                              {!unlocked && (
+                                <span className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                  {shopItem ? `${shopItem.price} c` : 'Locked'}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-500 block">Pet's Name 🏷️</label>
+                      <input 
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all outline-none text-slate-900 font-bold placeholder:font-normal placeholder:text-slate-400" 
+                        value={form.avatar_name} 
+                        onChange={e => setForm({...form, avatar_name: e.target.value})} 
+                        placeholder="e.g. Mochi" 
+                      />
+                    </div>
+                  </div>
+
+                </form>
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-slate-200 bg-slate-50 shrink-0 flex justify-end gap-3 rounded-b-[28px]">
+                <button 
+                  type="button" 
+                  className="px-6 py-3.5 rounded-2xl font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors"
+                  onClick={handleCloseModal}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  form="createGoalForm"
+                  className="px-8 py-3.5 rounded-2xl font-bold text-white bg-emerald-500 hover:bg-emerald-600 shadow-[0_8px_16px_rgba(74,222,128,0.25)] transition-all active:scale-95"
+                >
+                  {editingGoalId ? 'Save Changes ✨' : 'Create Goal ✨'}
+                </button>
+              </div>
+
             </motion.div>
-          </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

@@ -1,16 +1,15 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, ScanLine, Check, X, Sparkles, FileText, Store, DollarSign, Calendar, Tag } from 'lucide-react'
+import { Upload, ScanLine, Check, X, Sparkles, FileText, Store, DollarSign, Calendar, Tag, Info } from 'lucide-react'
 import { receipts as receiptApi, targets as targetApi } from '../api.js'
 
-// 1. Google Generative AI ကို Import လုပ်မယ်
+// 1. Import Google Generative AI SDK
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-// ⚠️ ခင်ဗျားရဲ့ လက်ရှိ API Key
-
+// ⚠️ API Key configuration using Vite environment variables
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
 
-// ဖိုင်ကို Gemini ဖတ်နိုင်တဲ့ Base64 format ပြောင်းပေးမယ့် helper function
+// Helper function to convert file to Base64 format readable by Gemini
 const fileToGenerativePart = async (file) => {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -26,20 +25,20 @@ const fileToGenerativePart = async (file) => {
   });
 };
 
-// 503 (High Demand) Error အတွက် ခေတ္တ စောင့်ဆိုင်းပေးမယ့် Helper function
+// Helper function to delay execution (useful for handling rate limits/high demand)
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const realOCR = async (file) => {
   const today = new Date().toISOString().split('T')[0];
   const imagePart = await fileToGenerativePart(file);
 
-  // စာဖတ်နှုန်း အရည်အသွေး ကောင်းမွန်စေရန် Model အသစ်နှင့် Schema သတ်မှတ်ချက်ကို သုံးထားပါတယ်
+  // Use Gemini API to parse the receipt image and extract structured data
   const model = genAI.getGenerativeModel({ 
     model: "gemini-2.5-flash",
     systemInstruction: "You are a professional financial auditor and highly accurate receipt parser. Analyze the provided image meticulously to extract information even if the image is slightly blurry or at an angle.",
     generationConfig: { 
       responseMimeType: "application/json",
-      // Output Format တိကျပြီး Error မတက်စေရန် Schema ပိတ်ထားခြင်း
+      // Enforce strict response schema for reliable parsing
       responseSchema: {
         type: "object",
         properties: {
@@ -61,7 +60,7 @@ export const realOCR = async (file) => {
     Ensure extreme accuracy for numbers and characters.
   `;
 
-  // Server overloaded ဖြစ်ရင် ၃ ကြိမ်အထိ အလိုအလျောက် ပြန်ကြိုးစားမည့် စနစ် (Exponential Backoff Retry)
+  // Exponential Backoff Retry mechanism (up to 3 attempts) if server is overloaded
   let maxRetries = 3;
   let attempt = 0;
 
@@ -84,13 +83,13 @@ export const realOCR = async (file) => {
       attempt++;
       console.warn(`Attempt ${attempt} failed. Error: ${err.message}`);
       
-      // အကယ်၍ 503 Overloaded Error ဖြစ်ခဲ့လျှင် ခေတ္တ စောင့်ပြီး ပြန်ကြိုးစားမည်
+      // If a 503 Overloaded Error or high demand occurs, wait briefly and retry
       if ((err.message?.includes('503') || err.message?.includes('demand')) && attempt < maxRetries) {
         await delay(attempt * 2000); // 1st try: 2s, 2nd try: 4s
         continue;
       }
 
-      // တကယ်လို့ retry လုပ်လို့မှ မရတော့ရင် အောက်က default တန်ဖိုးကို ပြန်ပေးမယ်
+      // If retries are exhausted, fallback to default parsing values
       console.error("Gemini Image Parsing Final Error:", err);
       alert("AI parsing is temporarily unavailable due to high server traffic. Please try again in a few moments.");
       
@@ -169,7 +168,7 @@ export default function ReceiptScanner() {
         image_path: image
       })
 
-      alert(`Receipt saved! ¥${result.total_price.toLocaleString()} added!`)
+      alert(`Receipt recorded! ¥${result.total_price.toLocaleString()} saved as Expense!`)
       setImage(null)
       setResult(null)
       setSelectedTarget('')
@@ -296,143 +295,141 @@ export default function ReceiptScanner() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
+                  className="bg-white rounded-[28px] border border-slate-200 shadow-md p-6 sm:p-8 mt-6 space-y-6"
                 >
+                  {/* Status Banner */}
                   <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      marginBottom: 16,
-                      padding: 12,
-                      background: result.confidence === 100 ? 'var(--accent-green-light)' : '#ffebee',
-                      borderRadius: 'var(--radius-md)'
-                    }}
+                    className={`flex items-center gap-3 p-4 rounded-2xl border ${
+                      result.confidence === 100 
+                        ? 'bg-red-50/60 border-red-100 text-red-700' 
+                        : 'bg-amber-50/60 border-amber-100 text-amber-700'
+                    }`}
                   >
-                    <Check size={20} color={result.confidence === 100 ? "var(--accent-green)" : "red"} />
-                    <span style={{ fontWeight: 700, color: result.confidence === 100 ? 'var(--accent-green)' : 'red' }}>
-                      {result.confidence === 100 ? `Detected via Gemini AI (Confidence: ${result.confidence}%)` : "AI Parsing Failed. Using Default Values."}
+                    <Check size={20} className={result.confidence === 100 ? "text-red-500" : "text-amber-500"} />
+                    <span className="font-extrabold text-sm">
+                      {result.confidence === 100 
+                        ? `Expense Detected via Gemini AI (Confidence: ${result.confidence}%)` 
+                        : "AI Parsing Failed. Using Default Values."}
                     </span>
                   </div>
 
-                  <div className="scanner-form">
-                    <div className="form-group">
-                      <label>
-                        <Store size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                  {/* Form Details */}
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-500 flex items-center gap-2">
+                        <Store size={16} className="text-red-500" />
                         Shop Name
                       </label>
                       <input 
-                        className="form-input" 
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/20 transition-all outline-none text-slate-900 font-bold placeholder:font-normal placeholder:text-slate-400" 
                         value={result.shop_name} 
                         onChange={(e) => setResult({...result, shop_name: e.target.value})} 
+                        placeholder="e.g. Lawson"
+                        required
                       />
                     </div>
 
-                    <div className="form-group">
-                      <label>
-                        <DollarSign size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-500 flex items-center gap-2">
+                        <DollarSign size={16} className="text-red-500" />
                         Total Price (¥)
                       </label>
-                      <input 
-                        className="form-input" 
-                        type="number"
-                        value={result.total_price} 
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setResult({
-                            ...result, 
-                            total_price: val,
-                            items: [{ name: 'お会計 / 合計', price: val }]
-                          })
-                        }} 
-                      />
+                      <div className="relative flex items-center border-b-2 border-red-500 pb-2">
+                        <span className="text-xl font-bold text-slate-400 mr-2">¥</span>
+                        <input 
+                          className="w-full border-0 bg-transparent text-xl font-bold text-slate-900 outline-none placeholder:text-slate-400" 
+                          type="number"
+                          value={result.total_price} 
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setResult({
+                              ...result, 
+                              total_price: val,
+                              items: [{ name: 'お会計 / 合計', price: val }]
+                            })
+                          }} 
+                          placeholder="e.g. 1500"
+                          min="0"
+                          required
+                        />
+                      </div>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                      <div className="form-group">
-                        <label>
-                          <Calendar size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-500 flex items-center gap-2">
+                          <Calendar size={16} className="text-red-500" />
                           Date
                         </label>
                         <input 
-                          className="form-input" 
+                          className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/20 transition-all outline-none text-slate-900 font-bold" 
                           type="date" 
                           value={result.date} 
                           onChange={(e) => setResult({...result, date: e.target.value})} 
                         />
                       </div>
 
-                      <div className="form-group">
-                        <label>
-                          <Tag size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-500 flex items-center gap-2">
+                          <Tag size={16} className="text-red-500" />
                           Category
                         </label>
                         <input 
-                          className="form-input" 
+                          className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/20 transition-all outline-none text-slate-900 font-bold" 
                           value={result.category} 
                           onChange={(e) => setResult({...result, category: e.target.value})} 
                         />
                       </div>
                     </div>
 
-                    <div className="form-group">
-                      <label>
-                        <FileText size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-500 flex items-center gap-2">
+                        <FileText size={16} className="text-red-500" />
                         Items Detected
                       </label>
 
-                      <div
-                        style={{
-                          background: 'var(--bg-primary)',
-                          borderRadius: 'var(--radius-md)',
-                          padding: 12,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 8
-                        }}
-                      >
+                      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-3">
                         {result.items.map((item, i) => (
-                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
+                          <div key={i} className="flex justify-between items-center text-sm font-bold text-slate-700">
                             <span>{item.name}</span>
-                            <span>¥{item.price.toLocaleString()}</span>
+                            <span className="text-slate-950">¥{item.price.toLocaleString()}</span>
                           </div>
                         ))}
 
-                        <div
-                          style={{
-                            borderTop: '1px solid var(--border-color)',
-                            marginTop: 4,
-                            paddingTop: '8px',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            fontWeight: 800
-                          }}
-                        >
-                          <span>Total</span>
-                          <span>¥{result.total_price.toLocaleString()}</span>
+                        <div className="border-t border-slate-200 pt-3 flex justify-between items-center font-extrabold text-base text-slate-900">
+                          <span>Total Spending</span>
+                          <span className="text-red-600 font-black">¥{result.total_price.toLocaleString()}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="form-group">
-                      <label>💰 Add to Savings Goal (Optional)</label>
+                    {/* Deduct from Savings Goal */}
+                    <div className="space-y-3">
+                      <label className="text-sm font-bold text-slate-500 block">💰 Deduct from Savings Goal (Optional)</label>
                       <select
-                        className="form-input"
+                        className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-red-500 focus:ring-4 focus:ring-red-500/20 transition-all outline-none text-slate-900 font-bold appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23ef4444%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:0.8rem_auto]"
                         value={selectedTarget}
                         onChange={e => setSelectedTarget(e.target.value)}
                       >
-                        <option value="">Don't add to goal</option>
+                        <option value="">Don't connect to savings goal</option>
                         {targets.map(t => (
                           <option key={t.id} value={t.id}>
                             {t.name} (¥{parseInt(t.current_amount || 0).toLocaleString()} / ¥{parseInt(t.target_amount || 0).toLocaleString()})
                           </option>
                         ))}
                       </select>
+                      {selectedTarget && (
+                        <div className="flex items-center gap-2 p-3.5 bg-amber-50 border border-amber-100 rounded-2xl text-amber-800 text-xs font-semibold">
+                          <Info size={14} className="flex-shrink-0" />
+                          <span>This expense will be deducted from your selected savings goal.</span>
+                        </div>
+                      )}
                     </div>
 
-                    <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                    {/* Action Buttons */}
+                    <div className="flex gap-4 pt-2">
                       <button
-                        className="btn btn-secondary"
-                        style={{ flex: 1 }}
+                        className="px-6 py-3.5 rounded-2xl font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors flex-1 flex items-center justify-center gap-2"
                         onClick={() => {
                           setImage(null)
                           setResult(null)
@@ -445,15 +442,14 @@ export default function ReceiptScanner() {
                       </button>
 
                       <button
-                        className="btn btn-primary"
-                        style={{ flex: 1 }}
+                        className="px-8 py-3.5 rounded-2xl font-bold text-white bg-red-500 hover:bg-red-600 shadow-[0_8px_16px_rgba(239,68,68,0.25)] transition-all active:scale-95 flex-1 flex items-center justify-center gap-2"
                         onClick={handleSave}
                         disabled={saving}
                       >
-                        {saving ? 'Saving...' : (
+                        {saving ? 'Recording...' : (
                           <>
                             <Check size={18} />
-                            Save Receipt
+                            Record Expense & Save
                           </>
                         )}
                       </button>

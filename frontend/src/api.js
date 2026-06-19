@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || "/api";
+const API_URL = import.meta.env.VITE_API_URL || "/api/index.php";
 
 class ApiError extends Error {
   constructor(message, status) {
@@ -90,12 +90,14 @@ export const dashboard = {
 export const targets = {
   list: (status = "active") => api(`targets?status=${status}`),
   create: (data) => api("targets", { method: "POST", body: data }),
+  update: (id, data) => api(`targets/${id}`, { method: "PUT", body: data }),
   delete: (id) => api(`targets/${id}`, { method: "DELETE" }),
 };
 
 export const transactions = {
   list: () => api("transactions"),
   create: (data) => api("transactions", { method: "POST", body: data }),
+  getInsights: () => api("transactions/insights"),
 };
 
 //calendar

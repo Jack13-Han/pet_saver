@@ -1,18 +1,68 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { User, Bell, Shield, Palette, LogOut, Save, ChevronRight } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useLanguage } from '../i18n.jsx'
 
 export default function Settings() {
   const { user, logout, updateUser } = useAuth()
+  const { language, setLanguage, languages } = useLanguage()
   const [activeTab, setActiveTab] = useState('profile')
   const [form, setForm] = useState({ username: user?.username || '', email: user?.email || '' })
+  const [privacy, setPrivacy] = useState({
+    public_profile: Boolean(Number(user?.public_profile ?? 0)),
+    show_on_leaderboard: Boolean(Number(user?.show_on_leaderboard ?? 1)),
+    share_achievements: true,
+  })
   const [saving, setSaving] = useState(false)
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark')
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.dataset.theme = 'dark'
+      localStorage.setItem('theme', 'dark')
+    } else {
+      delete document.documentElement.dataset.theme
+      localStorage.setItem('theme', 'light')
+    }
+  }, [darkMode])
+
+  useEffect(() => {
+    setForm({ username: user?.username || '', email: user?.email || '' })
+    setPrivacy(prev => ({
+      ...prev,
+      public_profile: Boolean(Number(user?.public_profile ?? 0)),
+      show_on_leaderboard: Boolean(Number(user?.show_on_leaderboard ?? 1)),
+    }))
+  }, [user])
 
   const handleSave = async () => {
     setSaving(true)
-    updateUser(form)
-    setTimeout(() => { setSaving(false); alert('Settings saved!') }, 500)
+    try {
+      await updateUser(form)
+      alert('Settings saved!')
+    } catch (err) {
+      console.error(err)
+      alert(err.message || 'Failed to save settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const updatePrivacy = async (key, value) => {
+    const previous = privacy
+    const next = { ...privacy, [key]: value }
+    setPrivacy(next)
+
+    try {
+      if (key !== 'share_achievements') {
+        await updateUser({ [key]: value ? 1 : 0 })
+      }
+    } catch (err) {
+      console.error(err)
+      setPrivacy(previous)
+      alert(err.message || 'Failed to save privacy setting')
+    }
   }
 
   const tabs = [
@@ -117,16 +167,16 @@ export default function Settings() {
               <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 24 }}>Privacy & Security</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {[
-                  { label: 'Public Profile', desc: 'Allow others to see your stats', default: false },
-                  { label: 'Show on Leaderboard', desc: 'Appear in global rankings', default: true },
-                  { label: 'Share Achievements', desc: 'Let friends see your badges', default: true },
+                  { key: 'public_profile', label: 'Public Profile', desc: 'Allow others to see your stats' },
+                  { key: 'show_on_leaderboard', label: 'Show on Leaderboard', desc: 'Appear in global rankings' },
+                  { key: 'share_achievements', label: 'Share Achievements', desc: 'Let friends see your badges' },
                 ].map((item, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
                     <div>
                       <div style={{ fontWeight: 700 }}>{item.label}</div>
                       <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>{item.desc}</div>
                     </div>
-                    <ToggleSwitch defaultChecked={item.default} />
+                    <ToggleSwitch checked={privacy[item.key]} onChange={(checked) => updatePrivacy(item.key, checked)} />
                   </div>
                 ))}
                 <div style={{ marginTop: 16 }}>
@@ -139,8 +189,30 @@ export default function Settings() {
           {activeTab === 'appearance' && (
             <div className="card">
               <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 24 }}>Appearance</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>Dark Mode</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>Switch to dark theme</div>
+                </div>
+                <ToggleSwitch checked={darkMode} onChange={setDarkMode} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>Language</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>Choose app language</div>
+                </div>
+                <select
+                  className="form-input"
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  style={{ width: 220 }}
+                >
+                  {languages.map(item => (
+                    <option key={item.code} value={item.code}>{item.label}</option>
+                  ))}
+                </select>
+              </div>
               {[
-                { label: 'Dark Mode', desc: 'Switch to dark theme' },
                 { label: 'Compact View', desc: 'Show more items per page' },
                 { label: 'Animations', desc: 'Enable smooth animations', default: true },
               ].map((item, i) => (
@@ -160,10 +232,23 @@ export default function Settings() {
   )
 }
 
-function ToggleSwitch({ defaultChecked }) {
-  const [checked, setChecked] = useState(defaultChecked)
+function ToggleSwitch({ defaultChecked, checked: controlledChecked, onChange }) {
+  const [internalChecked, setInternalChecked] = useState(defaultChecked)
+  const checked = controlledChecked ?? internalChecked
+
+  const toggle = () => {
+    const nextChecked = !checked
+    if (onChange) {
+      onChange(nextChecked)
+    } else {
+      setInternalChecked(nextChecked)
+    }
+  }
+
   return (
-    <button onClick={() => setChecked(!checked)}
+    <button onClick={toggle}
+      type="button"
+      aria-pressed={checked}
       style={{
         width: 48, height: 26, borderRadius: 13, border: 'none',
         background: checked ? 'var(--accent-green)' : 'var(--border-color)',

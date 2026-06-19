@@ -57,7 +57,7 @@ export default function Dashboard() {
   const [isScanning, setIsScanning] = useState(false);
   const [deletingExpiredGoal, setDeletingExpiredGoal] = useState(false);
   const fileInputRef = useRef(null);
-  const { updateUser } = useAuth();
+  const { user, updateUser } = useAuth();
   const navigate = useNavigate();
 
   const handleReceiptUpload = async (e) => {
@@ -219,9 +219,9 @@ export default function Dashboard() {
 
       if (res.data.status === "completed") {
         showToast("🎉 Goal completed! You earned coins!");
+        const currentCoins = user?.coins || parseInt(JSON.parse(localStorage.getItem('user'))?.coins) || 0;
         updateUser({
-          coins: (prev) =>
-            prev + Math.floor(data.activeTarget.target_amount / 100),
+          coins: currentCoins + Math.floor(data.activeTarget.target_amount / 100),
         });
       }
 
@@ -391,6 +391,33 @@ export default function Dashboard() {
 
       <div className="dashboard-grid">
         <div className="dashboard-main">
+          {/* CONGRATULATIONS BANNER */}
+          {target && target.status === 'completed' && (
+            <motion.div 
+              className="card"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              style={{
+                background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                border: '2px solid #10b981',
+                textAlign: 'center',
+                marginBottom: 20
+              }}
+            >
+              <h3 style={{ fontSize: 24, color: '#047857', marginBottom: 8 }}>🎉 Congratulations! 🎉</h3>
+              <p style={{ color: '#059669', fontWeight: 600, marginBottom: 16 }}>
+                You have successfully reached your goal! Any extra money you save now will automatically roll over to your next goal.
+              </p>
+              <button 
+                className="btn btn-primary"
+                style={{ background: '#059669', border: 'none' }}
+                onClick={() => navigate('/goals')}
+              >
+                Start New Goal
+              </button>
+            </motion.div>
+          )}
+
           {/* PET CARD */}
           {target ? (
             <motion.div
