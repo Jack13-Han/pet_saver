@@ -114,6 +114,8 @@ set_exception_handler(function (Throwable $e) use ($pdo) {
     exit();
 });
 
+ensureUserPrivacyColumns($pdo);
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 $path = $_GET['route'] ?? '';
@@ -212,9 +214,83 @@ if ($userId) {
 }
 
 if ($path === 'user' && $method === 'GET') {
-    $stmt = $pdo->prepare("SELECT id, username, email, coins, `rank`, streak_days, total_saved, total_targets_completed FROM users WHERE id = ?");
+    $stmt = $pdo->prepare("
+    SELECT
+        id,
+        username,
+        email,
+        coins,
+        `rank`,
+        streak_days,
+        total_saved,
+        total_targets_completed,
+        COALESCE(public_profile, 0) AS public_profile,
+        COALESCE(show_on_leaderboard, 1) AS show_on_leaderboard
+    FROM users
+    WHERE id = ?
+    ");
     $stmt->execute([$userId]);
     successResponse($stmt->fetch());
+}
+
+if ($path === 'user' && $method === 'PUT') {
+    $updates = [];
+    $params = [];
+
+    if (array_key_exists('username', $input)) {
+        $username = trim($input['username'] ?? '');
+        if (strlen($username) < 3) {
+            errorResponse('Username min 3 chars');
+        }
+        $updates[] = 'username = ?';
+        $params[] = $username;
+    }
+
+    if (array_key_exists('email', $input)) {
+        $email = trim($input['email'] ?? '');
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            errorResponse('Invalid email');
+        }
+        $updates[] = 'email = ?';
+        $params[] = $email;
+    }
+
+    if (array_key_exists('public_profile', $input)) {
+        $updates[] = 'public_profile = ?';
+        $params[] = !empty($input['public_profile']) ? 1 : 0;
+    }
+
+    if (array_key_exists('show_on_leaderboard', $input)) {
+        $updates[] = 'show_on_leaderboard = ?';
+        $params[] = !empty($input['show_on_leaderboard']) ? 1 : 0;
+    }
+
+    if (!$updates) {
+        errorResponse('No updates provided');
+    }
+
+    $params[] = $userId;
+    $stmt = $pdo->prepare('UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = ?');
+    $stmt->execute($params);
+
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            username,
+            email,
+            coins,
+            `rank`,
+            streak_days,
+            total_saved,
+            total_targets_completed,
+            COALESCE(public_profile, 0) AS public_profile,
+            COALESCE(show_on_leaderboard, 1) AS show_on_leaderboard
+        FROM users
+        WHERE id = ?
+    ");
+    $stmt->execute([$userId]);
+
+    successResponse($stmt->fetch(), 'Settings updated');
 }
 
 if ($path === 'user/active-target' && $method === 'POST') {
@@ -811,7 +887,7 @@ if ($path === 'receipts' && $method === 'GET') {
 }
 
 if ($path === 'rankings' && $method === 'GET') {
-    $stmt = $pdo->query("SELECT id, username, `rank`, total_targets_completed, total_saved, coins, CASE WHEN `rank` = 'Platinum' THEN 5 WHEN `rank` = 'Diamond' THEN 4 WHEN `rank` = 'Gold' THEN 3 WHEN `rank` = 'Silver' THEN 2 ELSE 1 END as rank_value FROM users ORDER BY rank_value DESC, total_targets_completed DESC, total_saved DESC LIMIT 50");
+    $stmt = $pdo->query("SELECT id, username, `rank`, total_targets_completed, total_saved, coins, CASE WHEN `rank` = 'Platinum' THEN 5 WHEN `rank` = 'Diamond' THEN 4 WHEN `rank` = 'Gold' THEN 3 WHEN `rank` = 'Silver' THEN 2 ELSE 1 END as rank_value FROM users WHERE COALESCE(show_on_leaderboard, 1) = 1 ORDER BY rank_value DESC, total_targets_completed DESC, total_saved DESC LIMIT 50");
     successResponse($stmt->fetchAll());
 }
 
@@ -901,6 +977,23 @@ function ensureAvatarShopItems($pdo)
     }
 }
 
+function ensureUserPrivacyColumns($pdo)
+{
+    try {
+        $pdo->query("SELECT public_profile, show_on_leaderboard FROM users LIMIT 1");
+    } catch (PDOException $e) {
+        try {
+            $pdo->exec("ALTER TABLE users ADD COLUMN public_profile TINYINT(1) NOT NULL DEFAULT 0");
+        } catch (PDOException $ignored) {
+        }
+
+        try {
+            $pdo->exec("ALTER TABLE users ADD COLUMN show_on_leaderboard TINYINT(1) NOT NULL DEFAULT 1");
+        } catch (PDOException $ignored) {
+        }
+    }
+}
+
 function normalizeShopItems($items, $owned = [])
 {
     $ownedIds = array_map('intval', $owned);
@@ -929,7 +1022,6 @@ function ensureCareActivityType($pdo)
         // Existing compatible databases need no migration.
     }
 }
-
 function checkAchievements($pdo, $userId)
 {
 

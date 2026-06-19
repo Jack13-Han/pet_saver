@@ -66,22 +66,26 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const updateUser = (updates) => {
+  const updateUser = async (updates) => {
+    let payload = typeof updates === "function" ? updates(user) : updates;
+
+    const apiFields = ["username", "email", "public_profile", "show_on_leaderboard"];
+    const hasApiField = Object.keys(payload || {}).some(key => apiFields.includes(key));
+    
+    let responseData = {};
+    if (hasApiField) {
+      const res = await userApi.update(payload);
+      responseData = res.data || res;
+    }
+    
+    let nextUser;
     setUser((currentUser) => {
-      const nextUpdates =
-        typeof updates === "function" ? updates(currentUser) : updates;
-      const resolvedUpdates = Object.fromEntries(
-        Object.entries(nextUpdates || {}).map(([key, value]) => [
-          key,
-          typeof value === "function"
-            ? value(currentUser?.[key], currentUser)
-            : value,
-        ]),
-      );
-      const newUser = { ...currentUser, ...resolvedUpdates };
-      localStorage.setItem("user", JSON.stringify(newUser));
-      return newUser;
+      nextUser = { ...currentUser, ...payload, ...responseData };
+      localStorage.setItem("user", JSON.stringify(nextUser));
+      return nextUser;
     });
+    
+    return nextUser || { ...user, ...payload, ...responseData };
   };
 
   return (
