@@ -102,7 +102,7 @@ INSERT INTO `achievements` (`id`, `user_id`, `title`, `description`, `icon`, `ti
 CREATE TABLE `activity_log` (
   `id` int NOT NULL,
   `user_id` int NOT NULL,
-  `activity_type` enum('save','receipt_scan','purchase','goal_complete','login') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `activity_type` enum('save','receipt_scan','purchase','goal_complete','login','care') COLLATE utf8mb4_unicode_ci NOT NULL,
   `points` int DEFAULT '0',
   `activity_date` date NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP

@@ -31,6 +31,7 @@ error_reporting(E_ALL);
 require_once 'config.php';
 
 const MAX_MONEY_AMOUNT = 9999999999999.99;
+const CARE_DAILY_LIMIT = 3;
 const STARTER_AVATAR_TYPES = ['dog', 'cat'];
 const AVATAR_UNLOCKS = [
     [
@@ -234,6 +235,7 @@ if ($path === 'user/active-target' && $method === 'POST') {
 }
 
 if ($path === 'dashboard' && $method === 'GET') {
+    ensureCareActivityType($pdo);
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$userId]);
     $userData = $stmt->fetch();
@@ -253,6 +255,11 @@ if ($path === 'dashboard' && $method === 'GET') {
     if ($activeTarget) {
         $activeTarget['progress'] = $activeTarget['target_amount'] > 0 ? round(($activeTarget['current_amount'] / $activeTarget['target_amount']) * 100, 1) : 0;
         $activeTarget['accessories'] = json_decode($activeTarget['accessories'] ?? '[]', true);
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE user_id = ? AND activity_type = 'care' AND activity_date = CURDATE()");
+        $stmt->execute([$userId]);
+        $careActionsToday = (int)$stmt->fetchColumn();
+        $activeTarget['care_actions_today'] = $careActionsToday;
+        $activeTarget['care_actions_remaining'] = max(0, CARE_DAILY_LIMIT - $careActionsToday);
     }
 
     $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 10");
@@ -288,7 +295,10 @@ if ($path === 'targets' && $method === 'GET') {
 if ($path === 'targets' && $method === 'POST') {
     $name = trim($input['name'] ?? '');
     $targetAmount = floatval($input['target_amount'] ?? 0);
+    $category = trim($input['category'] ?? 'General');
+    $categoryLength = function_exists('mb_strlen') ? mb_strlen($category) : strlen($category);
     if (empty($name) || $targetAmount <= 0) errorResponse('Name and target amount required');
+    if ($category === '' || $categoryLength > 50) errorResponse('Category must be between 1 and 50 characters');
     ensureTargetAvatarTypes($pdo);
     ensureAvatarShopItems($pdo);
 
@@ -324,7 +334,7 @@ if ($path === 'targets' && $method === 'POST') {
 
     try {
         $stmt = $pdo->prepare("INSERT INTO targets (user_id, name, description, target_amount, category, deadline, avatar_type, avatar_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$userId, $name, $input['description'] ?? '', $targetAmount, $input['category'] ?? 'General', $input['deadline'] ?? null, $avatarType, trim($input['avatar_name'] ?? 'Mochi')]);
+        $stmt->execute([$userId, $name, $input['description'] ?? '', $targetAmount, $category, $input['deadline'] ?? null, $avatarType, trim($input['avatar_name'] ?? 'Mochi')]);
 
         $targetId = $pdo->lastInsertId();
         // Check if user already has an active goal
@@ -381,7 +391,11 @@ if ($path === 'targets' && $method === 'POST') {
 }
 
 if (preg_match('/^targets\/(\d+)$/', $path, $m) && $method === 'DELETE') {
-    $pdo->prepare("DELETE FROM targets WHERE id = ? AND user_id = ?")->execute([$m[1], $userId]);
+    $targetId = (int)$m[1];
+    $pdo->beginTransaction();
+    $pdo->prepare("DELETE FROM targets WHERE id = ? AND user_id = ?")->execute([$targetId, $userId]);
+    $pdo->prepare("UPDATE users SET active_target_id = NULL WHERE id = ? AND active_target_id = ?")->execute([$userId, $targetId]);
+    $pdo->commit();
     successResponse(null, 'Target deleted');
 }
 
@@ -488,10 +502,26 @@ if ($path === 'avatars/care' && $method === 'POST') {
     $action = $input['action'] ?? '';
     if (!$targetId || !in_array($action, ['play', 'feed', 'rest', 'shower'])) errorResponse('Invalid care action');
 
+    ensureCareActivityType($pdo);
+    $pdo->beginTransaction();
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE id = ? FOR UPDATE");
+    $stmt->execute([$userId]);
+
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE user_id = ? AND activity_type = 'care' AND activity_date = CURDATE()");
+    $stmt->execute([$userId]);
+    $careActionsToday = (int)$stmt->fetchColumn();
+    if ($careActionsToday >= CARE_DAILY_LIMIT) {
+        $pdo->rollBack();
+        errorResponse('You can take care of your avatar only 3 times per day.', 429);
+    }
+
     $stmt = $pdo->prepare("SELECT a.* FROM avatars a JOIN targets t ON a.target_id = t.id WHERE a.target_id = ? AND t.user_id = ?");
     $stmt->execute([$targetId, $userId]);
     $avatar = $stmt->fetch();
-    if (!$avatar) errorResponse('Avatar not found');
+    if (!$avatar) {
+        $pdo->rollBack();
+        errorResponse('Avatar not found');
+    }
 
     $updates = [];
     $expGain = 10;
@@ -523,23 +553,26 @@ if ($path === 'avatars/care' && $method === 'POST') {
 
     $pdo->prepare("UPDATE avatars SET happiness = ?, energy = ?, fullness = ?, cleanliness = ?, exp = ?, level = ? WHERE target_id = ?")
         ->execute([$updates['happiness'] ?? $avatar['happiness'], $updates['energy'] ?? $avatar['energy'], $updates['fullness'] ?? $avatar['fullness'], $updates['cleanliness'] ?? $avatar['cleanliness'], $newExp, $newLevel, $targetId]);
-    successResponse(['level' => $newLevel, 'exp' => $newExp, 'stats' => $updates], 'Avatar cared for!');
+    $pdo->prepare("INSERT INTO activity_log (user_id, activity_type, points, activity_date) VALUES (?, 'care', 0, CURDATE())")
+        ->execute([$userId]);
+    $pdo->commit();
+
+    $careActionsToday++;
+    successResponse([
+        'level' => $newLevel,
+        'exp' => $newExp,
+        'stats' => $updates,
+        'care_actions_today' => $careActionsToday,
+        'care_actions_remaining' => max(0, CARE_DAILY_LIMIT - $careActionsToday),
+    ], 'Avatar cared for!');
 }
 
 if ($path === 'shop' && $method === 'GET') {
     ensureAvatarShopItems($pdo);
-    $category = $_GET['category'] ?? null;
-    if ($category === 'avatar') {
-        $avatarNames = avatarUnlockNames();
-        $placeholders = implode(',', array_fill(0, count($avatarNames), '?'));
-        $stmt = $pdo->prepare("SELECT * FROM accessories WHERE name IN ($placeholders) ORDER BY price");
-        $stmt->execute($avatarNames);
-    } elseif ($category) {
-        $stmt = $pdo->prepare("SELECT * FROM accessories WHERE category = ? AND category NOT IN ('glasses', 'scarf') ORDER BY price");
-        $stmt->execute([$category]);
-    } else {
-        $stmt = $pdo->query("SELECT * FROM accessories WHERE category NOT IN ('glasses', 'scarf') ORDER BY price");
-    }
+    $avatarNames = avatarUnlockNames();
+    $placeholders = implode(',', array_fill(0, count($avatarNames), '?'));
+    $stmt = $pdo->prepare("SELECT * FROM accessories WHERE name IN ($placeholders) ORDER BY price");
+    $stmt->execute($avatarNames);
     $items = $stmt->fetchAll();
     $stmt = $pdo->prepare("SELECT accessory_id FROM inventory WHERE user_id = ?");
     $stmt->execute([$userId]);
@@ -555,7 +588,7 @@ if ($path === 'shop/buy' && $method === 'POST') {
     $stmt->execute([$accessoryId]);
     $item = $stmt->fetch();
     if (!$item) errorResponse('Item not found');
-    if (in_array($item['category'], ['glasses', 'scarf'], true)) {
+    if (!in_array($item['name'], avatarUnlockNames(), true)) {
         errorResponse('This item is not available');
     }
     $stmt = $pdo->prepare("SELECT id FROM inventory WHERE user_id = ? AND accessory_id = ? AND target_id IS NULL LIMIT 1");
@@ -739,6 +772,18 @@ function normalizeShopItems($items, $owned = [])
     }
 
     return $items;
+}
+
+function ensureCareActivityType($pdo)
+{
+    try {
+        $column = $pdo->query("SHOW COLUMNS FROM activity_log LIKE 'activity_type'")->fetch();
+        if ($column && strpos($column['Type'], "'care'") === false) {
+            $pdo->exec("ALTER TABLE activity_log MODIFY activity_type ENUM('save','receipt_scan','purchase','goal_complete','login','care') NOT NULL");
+        }
+    } catch (Throwable $e) {
+        // Existing compatible databases need no migration.
+    }
 }
 
 function checkAchievements($pdo, $userId)

@@ -39,12 +39,13 @@ const getPetImageState = (target) => {
 
 export const getPetImage = (avatarType = "cat", state = "idle") => {
   const type = String(avatarType || "cat").toLowerCase();
+  const assetType = type === "lufy" ? "luffy" : type;
   const imageState = String(state || "idle").toLowerCase();
 
   return (
-    petImages[`${type}_${imageState}`] ||
-    petImages[`${type}_idle`] ||
-    petImages[type] ||
+    petImages[`${assetType}_${imageState}`] ||
+    petImages[`${assetType}_idle`] ||
+    petImages[assetType] ||
     petImages[`cat_${imageState}`] ||
     petImages.cat_idle
   );

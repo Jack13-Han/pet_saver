@@ -606,6 +606,22 @@ body {
   transform: scale(0.95);
 }
 
+.care-btn:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  background: #f8fafc;
+  border-color: var(--border-color);
+  box-shadow: none;
+  transform: none;
+}
+
+.care-btn:disabled:hover {
+  background: #f8fafc;
+  border-color: var(--border-color);
+  box-shadow: none;
+  transform: none;
+}
+
 .care-btn-icon {
   font-size: 28px;
 }
@@ -1309,6 +1325,45 @@ select.form-input {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-top: 24px;
+}
+
+.failure-modal {
+  width: min(100%, 440px);
+  padding: 32px;
+  border-radius: var(--radius-xl);
+  background: white;
+  border: 1px solid #fecaca;
+  box-shadow: 0 28px 70px rgba(127, 29, 29, 0.22);
+  text-align: center;
+}
+
+.failure-modal-icon {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 18px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.failure-modal h3 {
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.failure-modal p {
+  color: var(--text-secondary);
+  font-weight: 600;
+  line-height: 1.55;
+  margin-bottom: 24px;
+}
+
+.failure-modal .btn {
+  width: 100%;
 }
 
 .deadline-warning {

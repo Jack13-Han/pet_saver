@@ -12,6 +12,8 @@ import {
   Camera,
   ScanLine,
   Calendar,
+  AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import {
   dashboard as dashboardApi,
@@ -53,6 +55,7 @@ export default function Dashboard() {
   const [transactionCategory, setTransactionCategory] = useState("General");
   const [transactionNote, setTransactionNote] = useState("");
   const [isScanning, setIsScanning] = useState(false);
+  const [deletingExpiredGoal, setDeletingExpiredGoal] = useState(false);
   const fileInputRef = useRef(null);
   const { updateUser } = useAuth();
   const navigate = useNavigate();
@@ -80,11 +83,18 @@ export default function Dashboard() {
   };
   const target = data?.activeTarget;
   const progress = target?.progress || 0;
-  const daysUntilDeadline = target?.deadline
-    ? Math.ceil((new Date(target.deadline) - new Date()) / 86400000)
+  const deadlineEnd = target?.deadline
+    ? new Date(`${target.deadline}T23:59:59`)
     : null;
+  const daysUntilDeadline = target?.deadline
+    ? Math.ceil((deadlineEnd - new Date()) / 86400000)
+    : null;
+  const showExpiredGoal =
+    target && deadlineEnd && progress < 100 && deadlineEnd < new Date();
   const showDeadlineWarning =
-    target && target.deadline && progress < 100 && daysUntilDeadline !== null && daysUntilDeadline >= 0 && daysUntilDeadline <= 3;
+    target && !showExpiredGoal && target.deadline && progress < 100 && daysUntilDeadline !== null && daysUntilDeadline >= 0 && daysUntilDeadline <= 3;
+  const careActionsRemaining = target?.care_actions_remaining ?? 3;
+  const careLimitReached = careActionsRemaining <= 0;
   const shopPreview = (data?.shopPreview || []).filter(item => !['glasses', 'scarf'].includes(item.category));
   const getShopPreviewIcon = (item) => {
     if (item.avatar_type) return avatarTypes.find(type => type.id === item.avatar_type)?.emoji || item.icon;
@@ -223,15 +233,41 @@ export default function Dashboard() {
 
   const handleCare = async (action) => {
     if (!data?.activeTarget) return;
+    if (careLimitReached) {
+      showToast("You can take care of your avatar only 3 times per day.", "error");
+      return;
+    }
     try {
-      await avatarApi.care({
+      const res = await avatarApi.care({
         target_id: data.activeTarget.id,
         action: action.id,
       });
       showToast(`${action.title} completed! ✨`);
+      setData((prev) => ({
+        ...prev,
+        activeTarget: {
+          ...prev.activeTarget,
+          care_actions_today: res.data.care_actions_today,
+          care_actions_remaining: res.data.care_actions_remaining,
+        },
+      }));
       loadDashboard();
     } catch (err) {
-      showToast("Care action failed", "error");
+      showToast(err.message || "Care action failed", "error");
+    }
+  };
+
+  const deleteExpiredGoal = async () => {
+    if (!target || deletingExpiredGoal) return;
+    setDeletingExpiredGoal(true);
+    try {
+      await targetApi.delete(target.id);
+      setData((prev) => ({ ...prev, activeTarget: null }));
+      showToast("The expired goal was deleted.");
+    } catch (err) {
+      showToast(err.message || "Failed to delete expired goal", "error");
+    } finally {
+      setDeletingExpiredGoal(false);
     }
   };
 
@@ -281,6 +317,42 @@ export default function Dashboard() {
             exit={{ x: 100, opacity: 0 }}
           >
             {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showExpiredGoal && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="failure-modal"
+              initial={{ scale: 0.92, y: 24 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.92, y: 24 }}
+            >
+              <div className="failure-modal-icon">
+                <AlertTriangle size={34} />
+              </div>
+              <h3>You tried your best</h3>
+              <p>
+                Somehow the deadline passed before <strong>{target.name}</strong> was completed.
+                Delete this target and start again with a new goal.
+              </p>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={deleteExpiredGoal}
+                disabled={deletingExpiredGoal}
+              >
+                <Trash2 size={17} />
+                {deletingExpiredGoal ? "Deleting..." : "Delete failed target"}
+              </button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -886,9 +958,10 @@ export default function Dashboard() {
                   <motion.button
                     key={action.id}
                     className="care-btn"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    whileHover={careLimitReached ? undefined : { scale: 1.05 }}
+                    whileTap={careLimitReached ? undefined : { scale: 0.95 }}
                     onClick={() => handleCare(action)}
+                    disabled={careLimitReached}
                   >
                     <span className="care-btn-icon">{action.icon}</span>
                     <span className="care-btn-title">{action.title}</span>
@@ -905,7 +978,9 @@ export default function Dashboard() {
                   fontWeight: 600,
                 }}
               >
-                🗓️ Come back tomorrow for more activities!
+                {careLimitReached
+                  ? "Daily care limit reached. Come back tomorrow!"
+                  : `${careActionsRemaining} of 3 care actions remaining today.`}
               </p>
             </motion.div>
           )}

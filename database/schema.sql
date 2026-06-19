@@ -165,7 +165,8 @@ CREATE TABLE
             'receipt_scan',
             'purchase',
             'goal_complete',
-            'login'
+            'login',
+            'care'
         ) NOT NULL,
         points INT DEFAULT 0,
         activity_date DATE NOT NULL,

@@ -10,6 +10,7 @@ export default function Goals() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [loading, setLoading] = useState(true)
   const [avatarShopItems, setAvatarShopItems] = useState([])
+  const [customCategory, setCustomCategory] = useState('')
   const [form, setForm] = useState({
     name: '', description: '', target_amount: '', category: 'General',
     deadline: '', avatar_type: 'dog', avatar_name: 'Mochi'
@@ -37,15 +38,21 @@ export default function Goals() {
 
   const handleCreate = async (e) => {
     e.preventDefault()
+    const category = form.category === 'Custom' ? customCategory.trim() : form.category
+    if (!category) {
+      alert('Enter a category name.')
+      return
+    }
     const selectedType = avatarTypes.find(type => type.id === form.avatar_type)
     if (selectedType && !isAvatarUnlocked(selectedType)) {
       alert('Buy this avatar in the shop first.')
       return
     }
     try {
-      await targetApi.create({ ...form, target_amount: parseFloat(form.target_amount) })
+      await targetApi.create({ ...form, category, target_amount: parseFloat(form.target_amount) })
       setShowModal(false)
       setForm({ name: '', description: '', target_amount: '', category: 'General', deadline: '', avatar_type: 'dog', avatar_name: 'Mochi' })
+      setCustomCategory('')
       loadGoals()
     } catch (err) { alert(err.message) }
   }
@@ -177,8 +184,18 @@ export default function Goals() {
                 <div className="form-group">
                   <label>Category</label>
                   <select className="form-input" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
-                    <option>General</option><option>Education</option><option>Electronics</option><option>Travel</option><option>Emergency</option>
+                    <option>General</option><option>Education</option><option>Electronics</option><option>Travel</option><option>Emergency</option><option>Custom</option>
                   </select>
+                  {form.category === 'Custom' && (
+                    <input
+                      className="form-input"
+                      value={customCategory}
+                      onChange={e => setCustomCategory(e.target.value)}
+                      placeholder="Enter your category"
+                      maxLength={50}
+                      required
+                    />
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Deadline (Optional)</label>

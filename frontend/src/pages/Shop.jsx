@@ -1,21 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShoppingBag, Coins, Lock } from 'lucide-react'
+import { Coins, Lock } from 'lucide-react'
 import { shop as shopApi } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { avatarTypes } from '../petAssets.js'
 
-const categories = [
-  { id: 'all', label: 'All', icon: '🛍️' },
-  { id: 'avatar', label: 'Avatars', icon: '🐾' },
-  { id: 'hat', label: 'Hats', icon: '🧢' },
-  { id: 'toy', label: 'Toys', icon: '🎾' },
-  { id: 'background', label: 'Decor', icon: '🪴' },
-]
-
 export default function Shop() {
   const [items, setItems] = useState([])
-  const [category, setCategory] = useState('all')
   const [loading, setLoading] = useState(true)
   const [purchasing, setPurchasing] = useState(null)
   const { user, updateUser } = useAuth()
@@ -42,8 +33,7 @@ export default function Shop() {
     finally { setPurchasing(null) }
   }
 
-  const visibleItems = items.filter(i => !['glasses', 'scarf'].includes(i.category))
-  const filtered = category === 'all' ? visibleItems : visibleItems.filter(i => i.category === category)
+  const avatarItems = items.filter(item => item.category === 'avatar' && item.avatar_type)
   const getItemIcon = (item) => {
     if (item.avatar_type) return avatarTypes.find(type => type.id === item.avatar_type)?.emoji || item.icon
     return item.icon
@@ -56,7 +46,7 @@ export default function Shop() {
       <div className="page-header">
         <div className="page-title">
           <h2>Shop 🛒</h2>
-          <p>Spend coins to unlock new avatars and rewards!</p>
+          <p>Unlock new avatars for your savings goals.</p>
         </div>
         <div className="streak-badge" style={{ background: 'var(--accent-yellow-light)', color: 'var(--accent-yellow)' }}>
           <Coins size={20} />
@@ -64,25 +54,9 @@ export default function Shop() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 24, overflowX: 'auto', padding: '4px 0' }}>
-        {categories.map(cat => (
-          <button key={cat.id} onClick={() => setCategory(cat.id)}
-            style={{
-              padding: '10px 20px', borderRadius: 'var(--radius-full)', border: 'none',
-              background: category === cat.id ? 'var(--accent-green)' : 'white',
-              color: category === cat.id ? 'white' : 'var(--text-secondary)',
-              fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'inherit',
-              display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
-              boxShadow: category === cat.id ? 'var(--shadow-md)' : 'var(--shadow-sm)'
-            }}>
-            <span>{cat.icon}</span><span>{cat.label}</span>
-          </button>
-        ))}
-      </div>
-
       <div className="shop-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
         <AnimatePresence>
-          {filtered.map((item, i) => (
+          {avatarItems.map((item, i) => (
             <motion.div key={item.id} className={`shop-item ${item.owned ? 'owned' : ''}`}
               initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }} onClick={() => handleBuy(item)}>
               {item.owned && <div className="shop-item-owned-badge">Owned</div>}
