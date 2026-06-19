@@ -8,6 +8,7 @@ const navItems = [
   { path: '/goals', icon: Target, label: 'Goals' },
   { path: '/transactions', icon: Receipt, label: 'Expenses' },
   { path: '/insights', icon: BarChart3, label: 'Insights' },
+  { path: '/expense-analyst', icon: Flame, label: 'Expense Analyst' },
   { path: '/scanner', icon: Camera, label: 'Receipt Scanner' },
   { path: '/shop', icon: ShoppingBag, label: 'Shop' },
   { path: '/achievements', icon: Trophy, label: 'Achievements' },
