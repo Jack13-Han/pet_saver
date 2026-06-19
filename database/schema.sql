@@ -120,7 +120,7 @@ CREATE TABLE
     receipts (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
-        image_path VARCHAR(255),
+        image_path LONGTEXT,
         shop_name VARCHAR(100),
         total_price DECIMAL(15, 2),
         receipt_date DATE,
