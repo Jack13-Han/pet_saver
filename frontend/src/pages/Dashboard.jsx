@@ -382,7 +382,7 @@ export default function Dashboard() {
 
       <div className="page-header">
         <div className="page-title">
-          <h2>Hello, Saver! 👋</h2>
+          <h2>Hello, {user?.username || data?.user?.username || "Saver"}! 👋</h2>
           <p>Take care of your pet and reach your goals!</p>
         </div>
         <div className="header-actions">

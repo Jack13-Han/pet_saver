@@ -2031,6 +2031,157 @@ select.form-input {
   color: white;
 }
 
+/* SETTINGS */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.settings-nav {
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-tab,
+.settings-logout {
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.settings-tab {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.settings-tab:hover,
+.settings-tab.active {
+  background: var(--accent-green-light);
+  color: #15803d;
+}
+
+.settings-logout {
+  margin-top: 12px;
+  border-top: 1px solid var(--border-color);
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.settings-content {
+  min-width: 0;
+}
+
+.settings-panel {
+  max-width: 760px;
+}
+
+.settings-panel-title {
+  margin-bottom: 24px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.settings-profile-summary {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 28px;
+  min-width: 0;
+}
+
+.settings-profile-avatar {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 72px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-orange-light);
+  color: var(--accent-orange);
+}
+
+.settings-profile-copy,
+.settings-option-copy {
+  min-width: 0;
+}
+
+.settings-profile-name {
+  font-size: 20px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.settings-profile-email {
+  color: var(--text-muted);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.settings-form,
+.settings-options {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-save {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+
+.settings-option {
+  min-height: 62px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.settings-option-title {
+  font-weight: 700;
+}
+
+.settings-option-desc {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.settings-toggle {
+  flex: 0 0 48px;
+}
+
+.settings-danger-action {
+  margin-top: 16px;
+}
+
 /* RESPONSIVE */
 @media (max-width: 1024px) {
   .mobile-header {
@@ -2122,6 +2273,83 @@ select.form-input {
   }
   .modal-content {
     padding: 24px 20px;
+  }
+  .settings-page .page-header {
+    margin-bottom: 16px;
+  }
+  .settings-layout {
+    display: block;
+  }
+  .settings-nav {
+    margin: 0 -12px 16px;
+    padding: 8px 12px 10px;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+  .settings-tabs {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 6px;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+  .settings-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .settings-tab {
+    width: auto;
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 9px 12px;
+    font-size: 14px;
+  }
+  .settings-logout {
+    width: auto;
+    min-height: 40px;
+    margin-top: 8px;
+    padding: 9px 12px;
+  }
+  .settings-panel {
+    width: 100%;
+    max-width: none;
+  }
+  .settings-panel-title {
+    margin-bottom: 20px;
+    font-size: 18px;
+  }
+  .settings-profile-summary {
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .settings-profile-avatar {
+    width: 58px;
+    height: 58px;
+    flex-basis: 58px;
+  }
+  .settings-profile-name {
+    font-size: 18px;
+  }
+  .settings-profile-email {
+    font-size: 13px;
+  }
+  .settings-save,
+  .settings-danger-action .btn {
+    width: 100%;
+  }
+  .settings-option {
+    gap: 12px;
+  }
+  .settings-language-option {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .settings-language-option select {
+    width: 100% !important;
   }
 }
 
