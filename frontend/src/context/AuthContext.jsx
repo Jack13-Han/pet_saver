@@ -67,21 +67,25 @@ export function AuthProvider({ children }) {
   };
 
   const updateUser = async (updates) => {
-    const serverFields = [
-      "username",
-      "email",
-      "public_profile",
-      "show_on_leaderboard",
-    ];
-    const shouldSyncServer = Object.keys(updates).some((key) =>
-      serverFields.includes(key),
-    );
-    const res = shouldSyncServer ? await userApi.update(updates) : null;
-    const responseData = res ? res.data || res : updates;
-    const newUser = { ...user, ...responseData };
-    setUser(newUser);
-    localStorage.setItem("user", JSON.stringify(newUser));
-    return newUser;
+    let payload = typeof updates === "function" ? updates(user) : updates;
+
+    const apiFields = ["username", "email", "public_profile", "show_on_leaderboard"];
+    const hasApiField = Object.keys(payload || {}).some(key => apiFields.includes(key));
+
+    let responseData = {};
+    if (hasApiField) {
+      const res = await userApi.update(payload);
+      responseData = res.data || res;
+    }
+
+    let nextUser;
+    setUser((currentUser) => {
+      nextUser = { ...currentUser, ...payload, ...responseData };
+      localStorage.setItem("user", JSON.stringify(nextUser));
+      return nextUser;
+    });
+
+    return nextUser || { ...user, ...payload, ...responseData };
   };
 
   return (

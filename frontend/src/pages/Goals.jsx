@@ -1,21 +1,17 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Trash2, Target, Pencil } from 'lucide-react'
-import { targets as targetApi } from '../api.js'
-
-const avatarTypes = [
-  { id: 'dog', emoji: '🐕', name: 'Dog' },
-  { id: 'cat', emoji: '🐈', name: 'Cat' },
-  { id: 'tree', emoji: '🌳', name: 'Tree' },
-  { id: 'bird', emoji: '🐦', name: 'Bird' },
-  { id: 'rabbit', emoji: '🐇', name: 'Rabbit' },
-]
+import { Plus, Trash2, Target, Pencil, Lock, X } from 'lucide-react'
+import { shop as shopApi, targets as targetApi } from '../api.js'
+import { avatarTypes } from '../petAssets.js'
 
 export default function Goals() {
   const [goals, setGoals] = useState([])
   const [showModal, setShowModal] = useState(false)
   const [editingGoalId, setEditingGoalId] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [avatarShopItems, setAvatarShopItems] = useState([])
+  const [customCategory, setCustomCategory] = useState('')
   const [form, setForm] = useState({
     name: '', description: '', target_amount: '', category: 'General',
     deadline: '', avatar_type: 'dog', avatar_name: 'Mochi'
@@ -23,10 +19,20 @@ export default function Goals() {
 
   useEffect(() => { loadGoals() }, [])
 
+  const avatarShopMap = Object.fromEntries(
+    avatarShopItems
+      .filter(item => item.avatar_type)
+      .map(item => [item.avatar_type, item])
+  )
+
   const loadGoals = async () => {
     try {
-      const res = await targetApi.list('active')
-      setGoals(res.data || [])
+      const [goalRes, shopRes] = await Promise.all([
+        targetApi.list('active'),
+        shopApi.list()
+      ])
+      setGoals(goalRes.data || [])
+      setAvatarShopItems((shopRes.data || []).filter(item => item.category === 'avatar'))
     } catch (err) { console.error(err) }
     finally { setLoading(false) }
   }
@@ -56,21 +62,41 @@ export default function Goals() {
 
   const handleSave = async (e) => {
     e.preventDefault()
+    const category = form.category === 'Custom' ? customCategory.trim() : form.category
+    if (!category) {
+      alert('Enter a category name.')
+      return
+    }
+    const selectedType = avatarTypes.find(type => type.id === form.avatar_type)
+    if (selectedType && !isAvatarUnlocked(selectedType)) {
+      alert('Buy this avatar in the shop first.')
+      return
+    }
     try {
+      const finalForm = { ...form, category, target_amount: parseFloat(form.target_amount) }
       if (editingGoalId) {
-        await targetApi.update(editingGoalId, { ...form, target_amount: parseFloat(form.target_amount) })
+        await targetApi.update(editingGoalId, finalForm)
       } else {
-        await targetApi.create({ ...form, target_amount: parseFloat(form.target_amount) })
+        await targetApi.create(finalForm)
       }
       handleCloseModal()
+      setCustomCategory('')
       loadGoals()
     } catch (err) { alert(err.message) }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this goal?')) return
-    try { await targetApi.delete(id); loadGoals() }
-    catch (err) { alert(err.message) }
+  const isAvatarUnlocked = (type) => {
+    if (!type.requiresPurchase) return true
+    return Boolean(avatarShopMap[type.id]?.owned)
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      await targetApi.delete(deleteTarget.id)
+      setDeleteTarget(null)
+      loadGoals()
+    } catch (err) { alert(err.message) }
   }
 
   if (loading) return <div className="loading-screen"><div className="loading-paw">🐾</div></div>
@@ -106,10 +132,10 @@ export default function Goals() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => handleEditClick(goal)}>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => handleEditClick(goal)} aria-label={`Edit ${goal.name}`}>
                     <Pencil size={18} />
                   </button>
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => handleDelete(goal.id)}>
+                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setDeleteTarget(goal)} aria-label={`Delete ${goal.name}`}>
                     <Trash2 size={18} />
                   </button>
                 </div>
@@ -145,6 +171,31 @@ export default function Goals() {
         </div>
       )}
 
+      <AnimatePresence>
+        {deleteTarget && (
+          <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeleteTarget(null)}>
+            <motion.div className="delete-confirm-modal" initial={{ scale: 0.92, y: 24 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 24 }} onClick={e => e.stopPropagation()}>
+              <div className="delete-confirm-gif">
+                <img src="/delete-goal.gif" alt="" onError={e => { e.currentTarget.style.display = 'none' }} />
+              </div>
+              <div className="delete-confirm-box">
+                <button className="modal-close delete-confirm-close" onClick={() => setDeleteTarget(null)} aria-label="Close">
+                  <X size={18} />
+                </button>
+                <h3>Delete this goal?</h3>
+                <p>{deleteTarget.name} will be removed with its savings history.</p>
+                <div className="delete-confirm-actions">
+                  <button type="button" className="btn btn-secondary" onClick={() => setDeleteTarget(null)}>Cancel</button>
+                  <button type="button" className="btn btn-danger" onClick={confirmDelete}>
+                    <Trash2 size={16} /> Delete
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* CREATE/EDIT MODAL */}
       <AnimatePresence>
         {showModal && (
@@ -172,7 +223,6 @@ export default function Goals() {
                   <Plus className="w-5 h-5 rotate-45" />
                 </button>
               </div>
-
               {/* Form Body */}
               <div className="overflow-y-auto flex-1 p-6 sm:p-8 custom-scrollbar">
                 <form id="createGoalForm" onSubmit={handleSave} className="space-y-6">
@@ -213,8 +263,18 @@ export default function Goals() {
                           value={form.category} 
                           onChange={e => setForm({...form, category: e.target.value})}
                         >
-                          <option>General</option><option>Education</option><option>Electronics</option><option>Travel</option><option>Emergency</option>
+                          <option>General</option><option>Education</option><option>Electronics</option><option>Travel</option><option>Emergency</option><option>Custom</option>
                         </select>
+                        {form.category === 'Custom' && (
+                          <input
+                            className="w-full px-4 py-3 mt-2 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all outline-none text-slate-900 font-bold placeholder:font-normal placeholder:text-slate-400"
+                            value={customCategory}
+                            onChange={e => setCustomCategory(e.target.value)}
+                            placeholder="Enter custom category"
+                            maxLength={50}
+                            required
+                          />
+                        )}
                       </div>
                     </div>
 
@@ -236,23 +296,41 @@ export default function Goals() {
                     <div className="space-y-3">
                       <label className="text-sm font-bold text-slate-500 block">Choose Your Companion 🐾</label>
                       <div className="grid grid-cols-5 gap-3">
-                        {avatarTypes.map(type => (
-                          <button 
-                            key={type.id} 
-                            type="button" 
-                            onClick={() => setForm({...form, avatar_type: type.id})}
-                            className={`flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-300 ${
-                              form.avatar_type === type.id 
-                                ? 'border-emerald-500 bg-emerald-50 shadow-sm scale-105' 
-                                : 'border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50'
-                            }`}
-                          >
-                            <span className="text-3xl mb-1 filter drop-shadow-sm">{type.emoji}</span>
-                            <span className={`text-xs font-bold ${form.avatar_type === type.id ? 'text-emerald-700' : 'text-slate-500'}`}>
-                              {type.name}
-                            </span>
-                          </button>
-                        ))}
+                        {avatarTypes.map(type => {
+                          const unlocked = isAvatarUnlocked(type)
+                          const shopItem = avatarShopMap[type.id]
+                          const isSelected = form.avatar_type === type.id
+                          return (
+                            <button 
+                              key={type.id} 
+                              type="button" 
+                              onClick={() => unlocked && setForm({...form, avatar_type: type.id})}
+                              disabled={!unlocked}
+                              className={`relative flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-300 ${
+                                !unlocked 
+                                  ? 'border-slate-100 bg-slate-50/50 opacity-60 cursor-not-allowed'
+                                  : isSelected
+                                    ? 'border-emerald-500 bg-emerald-50 shadow-sm scale-105' 
+                                    : 'border-slate-200 bg-white hover:border-emerald-200 hover:bg-emerald-50/50'
+                              }`}
+                            >
+                              {!unlocked && (
+                                <span className="absolute top-1.5 right-1.5 p-0.5 bg-slate-200 rounded-full text-slate-500">
+                                  <Lock size={10} />
+                                </span>
+                              )}
+                              <span className="text-3xl mb-1 filter drop-shadow-sm">{type.emoji}</span>
+                              <span className={`text-xs font-bold ${isSelected ? 'text-emerald-700' : unlocked ? 'text-slate-500' : 'text-slate-400'}`}>
+                                {type.name}
+                              </span>
+                              {!unlocked && (
+                                <span className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                  {shopItem ? `${shopItem.price} c` : 'Locked'}
+                                </span>
+                              )}
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
                     
