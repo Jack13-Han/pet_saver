@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { User, Bell, Shield, Palette, LogOut, Save, ChevronRight } from 'lucide-react'
+import { User, Bell, Shield, Palette, LogOut, Save } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../i18n.jsx'
 
@@ -73,7 +73,7 @@ export default function Settings() {
   ]
 
   return (
-    <div className="animate-fade-in">
+    <div className="animate-fade-in settings-page">
       <div className="page-header">
         <div className="page-title">
           <h2>Settings ⚙️</h2>
@@ -81,49 +81,36 @@ export default function Settings() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 24 }}>
-        <div className="card" style={{ padding: 16, height: 'fit-content' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div className="settings-layout">
+        <nav className="settings-nav" aria-label="Settings sections">
+          <div className="settings-tabs">
             {tabs.map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 'var(--radius-md)',
-                  border: 'none', background: activeTab === tab.id ? 'var(--accent-green-light)' : 'transparent',
-                  color: activeTab === tab.id ? 'var(--accent-green)' : 'var(--text-secondary)',
-                  fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'inherit', fontSize: 15
-                }}>
+                className={`settings-tab ${activeTab === tab.id ? 'active' : ''}`}>
                 <tab.icon size={18} /><span>{tab.label}</span>
               </button>
             ))}
-            <div style={{ borderTop: '1px solid var(--border-color)', margin: '8px 0' }} />
-            <button onClick={logout}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 'var(--radius-md)',
-                border: 'none', background: '#FEE2E2', color: '#EF4444', fontWeight: 700, cursor: 'pointer',
-                fontFamily: 'inherit', fontSize: 15
-              }}>
-              <LogOut size={18} /><span>Logout</span>
-            </button>
           </div>
-        </div>
+          <button onClick={logout} className="settings-logout">
+            <LogOut size={18} /><span>Logout</span>
+          </button>
+        </nav>
 
-        <motion.div key={activeTab} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2 }}>
+        <motion.div className="settings-content" key={activeTab} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2 }}>
           {activeTab === 'profile' && (
-            <div className="card">
-              <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 24 }}>Profile Information</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 32 }}>
-                <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'var(--accent-orange-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36 }}>
-                  👤
-                </div>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: 20 }}>{user?.username}</div>
-                  <div style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{user?.email}</div>
+            <div className="card settings-panel">
+              <h3 className="settings-panel-title">Profile Information</h3>
+              <div className="settings-profile-summary">
+                <div className="settings-profile-avatar"><User size={34} /></div>
+                <div className="settings-profile-copy">
+                  <div className="settings-profile-name">{user?.username}</div>
+                  <div className="settings-profile-email">{user?.email}</div>
                   <div style={{ marginTop: 4 }}>
                     <span className={`ranking-rank-badge ${user?.rank}`}>{user?.rank}</span>
                   </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="settings-form">
                 <div className="form-group">
                   <label>Username</label>
                   <input className="form-input" value={form.username} onChange={e => setForm({...form, username: e.target.value})} />
@@ -132,7 +119,7 @@ export default function Settings() {
                   <label>Email</label>
                   <input className="form-input" type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
                 </div>
-                <button className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: 8 }} onClick={handleSave} disabled={saving}>
+                <button className="btn btn-primary settings-save" onClick={handleSave} disabled={saving}>
                   <Save size={18} /> {saving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
@@ -140,9 +127,9 @@ export default function Settings() {
           )}
 
           {activeTab === 'notifications' && (
-            <div className="card">
-              <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 24 }}>Notification Preferences</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="card settings-panel">
+              <h3 className="settings-panel-title">Notification Preferences</h3>
+              <div className="settings-options">
                 {[
                   { label: 'Daily Saving Reminder', desc: 'Get reminded to save every day', default: true },
                   { label: 'Goal Milestones', desc: 'Notify when you reach 25%, 50%, 75%', default: true },
@@ -150,10 +137,10 @@ export default function Settings() {
                   { label: 'Achievement Unlocks', desc: 'Celebrate when you earn badges', default: true },
                   { label: 'Weekly Summary', desc: 'Weekly report of savings', default: false },
                 ].map((item, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
-                    <div>
-                      <div style={{ fontWeight: 700 }}>{item.label}</div>
-                      <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>{item.desc}</div>
+                  <div key={i} className="settings-option">
+                    <div className="settings-option-copy">
+                      <div className="settings-option-title">{item.label}</div>
+                      <div className="settings-option-desc">{item.desc}</div>
                     </div>
                     <ToggleSwitch defaultChecked={item.default} />
                   </div>
@@ -163,23 +150,23 @@ export default function Settings() {
           )}
 
           {activeTab === 'privacy' && (
-            <div className="card">
-              <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 24 }}>Privacy & Security</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="card settings-panel">
+              <h3 className="settings-panel-title">Privacy & Security</h3>
+              <div className="settings-options">
                 {[
                   { key: 'public_profile', label: 'Public Profile', desc: 'Allow others to see your stats' },
                   { key: 'show_on_leaderboard', label: 'Show on Leaderboard', desc: 'Appear in global rankings' },
                   { key: 'share_achievements', label: 'Share Achievements', desc: 'Let friends see your badges' },
                 ].map((item, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
-                    <div>
-                      <div style={{ fontWeight: 700 }}>{item.label}</div>
-                      <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>{item.desc}</div>
+                  <div key={i} className="settings-option">
+                    <div className="settings-option-copy">
+                      <div className="settings-option-title">{item.label}</div>
+                      <div className="settings-option-desc">{item.desc}</div>
                     </div>
                     <ToggleSwitch checked={privacy[item.key]} onChange={(checked) => updatePrivacy(item.key, checked)} />
                   </div>
                 ))}
-                <div style={{ marginTop: 16 }}>
+                <div className="settings-danger-action">
                   <button className="btn btn-danger"><Shield size={18} /> Change Password</button>
                 </div>
               </div>
@@ -187,25 +174,25 @@ export default function Settings() {
           )}
 
           {activeTab === 'appearance' && (
-            <div className="card">
-              <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 24 }}>Appearance</h3>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
-                <div>
-                  <div style={{ fontWeight: 700 }}>Dark Mode</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>Switch to dark theme</div>
+            <div className="card settings-panel">
+              <h3 className="settings-panel-title">Appearance</h3>
+              <div className="settings-option">
+                <div className="settings-option-copy">
+                  <div className="settings-option-title">Dark Mode</div>
+                  <div className="settings-option-desc">Switch to dark theme</div>
                 </div>
                 <ToggleSwitch checked={darkMode} onChange={setDarkMode} />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
-                <div>
-                  <div style={{ fontWeight: 700 }}>Language</div>
-                  <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>Choose app language</div>
+              <div className="settings-option settings-language-option">
+                <div className="settings-option-copy">
+                  <div className="settings-option-title">Language</div>
+                  <div className="settings-option-desc">Choose app language</div>
                 </div>
                 <select
                   className="form-input"
                   value={language}
                   onChange={(e) => setLanguage(e.target.value)}
-                  style={{ width: 220 }}
+                  style={{ width: 'min(220px, 100%)' }}
                 >
                   {languages.map(item => (
                     <option key={item.code} value={item.code}>{item.label}</option>
@@ -216,10 +203,10 @@ export default function Settings() {
                 { label: 'Compact View', desc: 'Show more items per page' },
                 { label: 'Animations', desc: 'Enable smooth animations', default: true },
               ].map((item, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{item.label}</div>
-                    <div style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>{item.desc}</div>
+                <div key={i} className="settings-option">
+                  <div className="settings-option-copy">
+                    <div className="settings-option-title">{item.label}</div>
+                    <div className="settings-option-desc">{item.desc}</div>
                   </div>
                   <ToggleSwitch defaultChecked={item.default ?? false} />
                 </div>
@@ -247,6 +234,7 @@ function ToggleSwitch({ defaultChecked, checked: controlledChecked, onChange }) 
 
   return (
     <button onClick={toggle}
+      className="settings-toggle"
       type="button"
       aria-pressed={checked}
       style={{
