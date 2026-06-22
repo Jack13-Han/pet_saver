@@ -115,6 +115,7 @@ set_exception_handler(function (Throwable $e) use ($pdo) {
 });
 
 ensureUserPrivacyColumns($pdo);
+ensureFinanceFeatureTables($pdo);
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -211,6 +212,8 @@ if ($userId) {
     if (!$stmt->fetch()) {
         errorResponse('Unauthorized', 401);
     }
+
+    applyDueRecurringEntries($pdo, $userId);
 }
 
 if ($path === 'user' && $method === 'GET') {
@@ -345,7 +348,19 @@ if ($path === 'dashboard' && $method === 'GET') {
     $activeTarget = $stmt->fetch();
 
     if ($activeTarget) {
-        $activeTarget['progress'] = $activeTarget['target_amount'] > 0 ? round(($activeTarget['current_amount'] / $activeTarget['target_amount']) * 100, 1) : 0;
+        $stmt = $pdo->prepare("
+            SELECT
+                COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) -
+                COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0) AS net_savings
+            FROM transactions
+            WHERE user_id = ?
+        ");
+        $stmt->execute([$userId]);
+        $netSavings = max(0, (float)$stmt->fetchColumn());
+
+        $activeTarget['current_amount'] = $netSavings;
+        $activeTarget['progress'] = $activeTarget['target_amount'] > 0 ? round(($netSavings / $activeTarget['target_amount']) * 100, 1) : 0;
+        $activeTarget['status'] = $activeTarget['progress'] >= 100 ? 'completed' : 'active';
         $activeTarget['accessories'] = json_decode($activeTarget['accessories'] ?? '[]', true);
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE user_id = ? AND activity_type = 'care' AND activity_date = CURDATE()");
         $stmt->execute([$userId]);
@@ -615,6 +630,16 @@ if ($path === 'transactions' && $method === 'POST') {
         $newAmount = max(0, $target['current_amount'] - $amount);
     }
 
+    $stmt = $pdo->prepare("
+        SELECT
+            COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) -
+            COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0)
+        FROM transactions
+        WHERE user_id = ?
+    ");
+    $stmt->execute([$userId]);
+    $newAmount = max(0, (float)$stmt->fetchColumn());
+
     $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
     $displayProgress = min(100, $progress);
     $status = $progress >= 100 ? 'completed' : 'active';
@@ -648,7 +673,7 @@ if ($path === 'transactions' && $method === 'POST') {
 }
 
 if ($path === 'transactions' && $method === 'GET') {
-    $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t LEFT JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 50");
+    $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t LEFT JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC");
     $stmt->execute([$userId]);
     successResponse($stmt->fetchAll());
 }
@@ -845,6 +870,17 @@ if ($path === 'achievements' && $method === 'GET') {
     successResponse($stmt->fetchAll());
 }
 
+if ($path === 'receipts/scan' && $method === 'POST') {
+    $image = $input['image'] ?? '';
+    $mimeType = $input['mime_type'] ?? 'image/jpeg';
+
+    if (empty($image)) {
+        errorResponse('Receipt image is required');
+    }
+
+    successResponse(scanReceiptWithGemini($image, $mimeType), 'Receipt scanned');
+}
+
 if ($path === 'receipts' && $method === 'POST') {
     $targetId = intval($input['target_id'] ?? 0);
     $totalPriceInput = $input['total_price'] ?? null;
@@ -889,6 +925,119 @@ if ($path === 'receipts' && $method === 'GET') {
 if ($path === 'rankings' && $method === 'GET') {
     $stmt = $pdo->query("SELECT id, username, `rank`, total_targets_completed, total_saved, coins, CASE WHEN `rank` = 'Platinum' THEN 5 WHEN `rank` = 'Diamond' THEN 4 WHEN `rank` = 'Gold' THEN 3 WHEN `rank` = 'Silver' THEN 2 ELSE 1 END as rank_value FROM users WHERE COALESCE(show_on_leaderboard, 1) = 1 ORDER BY rank_value DESC, total_targets_completed DESC, total_saved DESC LIMIT 50");
     successResponse($stmt->fetchAll());
+}
+
+if ($path === 'budgets' && $method === 'GET') {
+    successResponse(getBudgetRows($pdo, $userId));
+}
+
+if ($path === 'budgets' && $method === 'POST') {
+    $category = trim($input['category'] ?? '');
+    $amount = floatval($input['monthly_limit'] ?? 0);
+
+    if ($category === '' || $amount < 0) {
+        errorResponse('Category and monthly limit are required');
+    }
+
+    $stmt = $pdo->prepare("
+        INSERT INTO budgets (user_id, category, monthly_limit)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE monthly_limit = VALUES(monthly_limit), updated_at = CURRENT_TIMESTAMP
+    ");
+    $stmt->execute([$userId, $category, $amount]);
+
+    successResponse(getBudgetRows($pdo, $userId), 'Budget saved');
+}
+
+if ($path === 'recurring' && $method === 'GET') {
+    $stmt = $pdo->prepare("SELECT * FROM recurring_entries WHERE user_id = ? ORDER BY next_run_date ASC, id DESC");
+    $stmt->execute([$userId]);
+    successResponse($stmt->fetchAll());
+}
+
+if ($path === 'recurring' && $method === 'POST') {
+    $name = trim($input['name'] ?? '');
+    $amount = floatval($input['amount'] ?? 0);
+    $type = $input['type'] ?? '';
+    $category = trim($input['category'] ?? 'General');
+    $frequency = $input['frequency'] ?? 'monthly';
+    $nextRun = $input['next_run_date'] ?? date('Y-m-d');
+    $targetId = !empty($input['target_id']) ? intval($input['target_id']) : null;
+
+    if ($name === '' || $amount <= 0 || !in_array($type, ['deposit', 'withdrawal']) || !in_array($frequency, ['weekly', 'monthly'])) {
+        errorResponse('Valid name, amount, type, and frequency are required');
+    }
+
+    $stmt = $pdo->prepare("
+        INSERT INTO recurring_entries (user_id, target_id, name, amount, type, category, frequency, next_run_date, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+    ");
+    $stmt->execute([$userId, $targetId, $name, $amount, $type, $category, $frequency, $nextRun]);
+
+    successResponse(null, 'Recurring entry saved');
+}
+
+if (preg_match('/^recurring\/(\d+)$/', $path, $m) && $method === 'DELETE') {
+    $pdo->prepare("DELETE FROM recurring_entries WHERE id = ? AND user_id = ?")->execute([intval($m[1]), $userId]);
+    successResponse(null, 'Recurring entry deleted');
+}
+
+if ($path === 'finance/overview' && $method === 'GET') {
+    successResponse(getFinanceOverview($pdo, $userId));
+}
+
+if ($path === 'finance/export' && $method === 'GET') {
+    $stmt = $pdo->prepare("
+        SELECT t.transaction_date, t.type, t.category, t.amount, t.note, tg.name AS target_name
+        FROM transactions t
+        LEFT JOIN targets tg ON t.target_id = tg.id
+        WHERE t.user_id = ?
+        ORDER BY t.transaction_date DESC, t.id DESC
+    ");
+    $stmt->execute([$userId]);
+    $rows = $stmt->fetchAll();
+
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="pet-saver-transactions.csv"');
+    $out = fopen('php://output', 'w');
+    fputcsv($out, ['date', 'type', 'category', 'amount', 'note', 'target']);
+    foreach ($rows as $row) {
+        fputcsv($out, [$row['transaction_date'], $row['type'], $row['category'], $row['amount'], $row['note'], $row['target_name']]);
+    }
+    fclose($out);
+    exit();
+}
+
+if ($path === 'missions/claim' && $method === 'POST') {
+    $missionId = trim($input['mission_id'] ?? '');
+    $overview = getFinanceOverview($pdo, $userId);
+    $mission = null;
+
+    foreach ($overview['missions'] as $candidate) {
+        if ($candidate['id'] === $missionId) {
+            $mission = $candidate;
+            break;
+        }
+    }
+
+    if (!$mission || empty($mission['completed'])) {
+        errorResponse('Mission is not completed');
+    }
+
+    $stmt = $pdo->prepare("SELECT id FROM mission_claims WHERE user_id = ? AND mission_id = ?");
+    $stmt->execute([$userId, $missionId]);
+    if ($stmt->fetch()) {
+        errorResponse('Mission already claimed');
+    }
+
+    $reward = intval($mission['reward'] ?? 0);
+    $pdo->beginTransaction();
+    $pdo->prepare("INSERT INTO mission_claims (user_id, mission_id, reward_coins) VALUES (?, ?, ?)")
+        ->execute([$userId, $missionId, $reward]);
+    $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$reward, $userId]);
+    $pdo->commit();
+
+    successResponse(['coins' => $reward], 'Mission reward claimed');
 }
 
 // HELPERS
@@ -977,6 +1126,182 @@ function ensureAvatarShopItems($pdo)
     }
 }
 
+function scanReceiptWithGemini($image, $mimeType)
+{
+    $apiKey = getenv('GEMINI_API_KEY') ?: ($_ENV['GEMINI_API_KEY'] ?? '');
+    if ($apiKey === '') {
+        $apiKey = getenv('VITE_GEMINI_API_KEY') ?: ($_ENV['VITE_GEMINI_API_KEY'] ?? '');
+    }
+
+    if ($apiKey === '') {
+        errorResponse('Gemini API key is missing in api/.env', 500);
+    }
+
+    if (!preg_match('/^image\/(jpeg|jpg|png|webp|heic|heif)$/i', $mimeType)) {
+        errorResponse('Unsupported receipt image type');
+    }
+
+    $prompt = "Analyze this receipt image and return strict JSON only. "
+        . "Extract the official store name, final total paid amount, and transaction date. "
+        . "If the receipt is Japanese, keep the store name in Japanese. "
+        . "For the total, use the final paid amount only and return an integer. "
+        . "For missing year, assume 2026. Date format must be YYYY-MM-DD. "
+        . "JSON keys: shop_name, total_price, date.";
+
+    $payload = [
+        'systemInstruction' => [
+            'parts' => [[
+                'text' => 'You are a highly accurate receipt parser. Return valid JSON only.'
+            ]]
+        ],
+        'contents' => [[
+            'role' => 'user',
+            'parts' => [
+                ['text' => $prompt],
+                [
+                    'inline_data' => [
+                        'mime_type' => $mimeType,
+                        'data' => $image
+                    ]
+                ]
+            ]
+        ]],
+        'generationConfig' => [
+            'responseMimeType' => 'application/json'
+        ]
+    ];
+
+    $endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . rawurlencode($apiKey);
+    [$status, $body] = postJson($endpoint, $payload);
+
+    if ($status < 200 || $status >= 300) {
+        $code = $status === 503 ? 503 : 500;
+        $errorPayload = json_decode($body, true);
+        $message = $errorPayload['error']['message'] ?? ('Gemini scan failed: HTTP ' . $status);
+        errorResponse($message, $code);
+    }
+
+    $decoded = json_decode($body, true);
+    $text = $decoded['candidates'][0]['content']['parts'][0]['text'] ?? '';
+    $text = trim(preg_replace('/^```json|```$/m', '', $text));
+    $parsed = json_decode($text, true);
+
+    if (!is_array($parsed)) {
+        errorResponse('Gemini returned unreadable receipt data', 500);
+    }
+
+    return [
+        'shop_name' => trim($parsed['shop_name'] ?? 'Unknown Shop') ?: 'Unknown Shop',
+        'total_price' => max(0, (int)round((float)($parsed['total_price'] ?? 0))),
+        'date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $parsed['date'] ?? '') ? $parsed['date'] : date('Y-m-d')
+    ];
+}
+
+function postJson($url, $payload)
+{
+    $json = json_encode($payload);
+
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => $json,
+            CURLOPT_TIMEOUT => 45,
+        ]);
+        $body = curl_exec($ch);
+        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($body === false) {
+            errorResponse('Gemini network error: ' . $error, 500);
+        }
+
+        return [$status, $body];
+    }
+
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\n",
+            'content' => $json,
+            'timeout' => 45,
+            'ignore_errors' => true,
+        ]
+    ]);
+
+    $body = file_get_contents($url, false, $context);
+    $status = 0;
+    if (!empty($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $matches)) {
+        $status = (int)$matches[1];
+    }
+
+    if ($body === false) {
+        errorResponse('Gemini network error', 500);
+    }
+
+    return [$status, $body];
+}
+
+function ensureFinanceFeatureTables($pdo)
+{
+    try {
+        $pdo->query("SELECT category FROM transactions LIMIT 1");
+    } catch (PDOException $e) {
+        try {
+            $pdo->exec("ALTER TABLE transactions ADD COLUMN category VARCHAR(50) DEFAULT 'General' AFTER type");
+        } catch (PDOException $ignored) {
+        }
+    }
+
+    try {
+        $pdo->exec("ALTER TABLE transactions MODIFY target_id INT DEFAULT NULL");
+    } catch (PDOException $ignored) {
+    }
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS budgets (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            category VARCHAR(50) NOT NULL,
+            monthly_limit DECIMAL(15,2) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_user_budget_category (user_id, category)
+        )
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS recurring_entries (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            target_id INT DEFAULT NULL,
+            name VARCHAR(100) NOT NULL,
+            amount DECIMAL(15,2) NOT NULL,
+            type ENUM('deposit','withdrawal') NOT NULL,
+            category VARCHAR(50) DEFAULT 'General',
+            frequency ENUM('weekly','monthly') DEFAULT 'monthly',
+            next_run_date DATE NOT NULL,
+            last_run_date DATE DEFAULT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS mission_claims (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            mission_id VARCHAR(80) NOT NULL,
+            reward_coins INT NOT NULL DEFAULT 0,
+            claimed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_user_mission (user_id, mission_id)
+        )
+    ");
+}
+
 function ensureUserPrivacyColumns($pdo)
 {
     try {
@@ -1022,6 +1347,323 @@ function ensureCareActivityType($pdo)
         // Existing compatible databases need no migration.
     }
 }
+
+function getBudgetRows($pdo, $userId)
+{
+    $stmt = $pdo->prepare("SELECT * FROM budgets WHERE user_id = ? ORDER BY category ASC");
+    $stmt->execute([$userId]);
+    return $stmt->fetchAll();
+}
+
+function applyDueRecurringEntries($pdo, $userId)
+{
+    $today = date('Y-m-d');
+    $stmt = $pdo->prepare("
+        SELECT *
+        FROM recurring_entries
+        WHERE user_id = ? AND is_active = 1 AND next_run_date <= ?
+        ORDER BY next_run_date ASC
+    ");
+    $stmt->execute([$userId, $today]);
+    $entries = $stmt->fetchAll();
+    $applied = [];
+
+    foreach ($entries as $entry) {
+        $targetId = $entry['target_id'];
+        if (!$targetId) {
+            $targetStmt = $pdo->prepare("SELECT active_target_id FROM users WHERE id = ?");
+            $targetStmt->execute([$userId]);
+            $targetId = $targetStmt->fetchColumn();
+        }
+
+        if (!$targetId) {
+            continue;
+        }
+
+        $nextRun = $entry['next_run_date'];
+        $runs = 0;
+
+        while ($nextRun <= $today && $runs < 24) {
+            $pdo->beginTransaction();
+
+            $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, category, note, transaction_date) VALUES (?, ?, ?, ?, ?, ?, ?)")
+                ->execute([$targetId, $userId, $entry['amount'], $entry['type'], $entry['category'], 'Recurring: ' . $entry['name'], $nextRun]);
+
+            if ($entry['type'] === 'deposit') {
+                $pdo->prepare("UPDATE users SET total_saved = total_saved + ? WHERE id = ?")
+                    ->execute([$entry['amount'], $userId]);
+            }
+
+            $lastRun = $nextRun;
+            $nextRun = $entry['frequency'] === 'weekly'
+                ? date('Y-m-d', strtotime($nextRun . ' +7 days'))
+                : date('Y-m-d', strtotime($nextRun . ' +1 month'));
+
+            $pdo->prepare("UPDATE recurring_entries SET last_run_date = ?, next_run_date = ? WHERE id = ? AND user_id = ?")
+                ->execute([$lastRun, $nextRun, $entry['id'], $userId]);
+
+            syncTargetFromTransactions($pdo, $userId, $targetId);
+            $pdo->commit();
+
+            $applied[] = [
+                'id' => (int)$entry['id'],
+                'name' => $entry['name'],
+                'amount' => (float)$entry['amount'],
+                'run_date' => $lastRun,
+                'next_run_date' => $nextRun
+            ];
+
+            $runs++;
+        }
+    }
+
+    if ($applied) {
+        checkAchievements($pdo, $userId);
+    }
+
+    return $applied;
+}
+
+function syncTargetFromTransactions($pdo, $userId, $targetId)
+{
+    $stmt = $pdo->prepare("SELECT * FROM targets WHERE id = ? AND user_id = ?");
+    $stmt->execute([$targetId, $userId]);
+    $target = $stmt->fetch();
+
+    if (!$target) {
+        return;
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT
+            COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) -
+            COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0)
+        FROM transactions
+        WHERE user_id = ?
+    ");
+    $stmt->execute([$userId]);
+    $newAmount = max(0, (float)$stmt->fetchColumn());
+
+    $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
+    $status = $progress >= 100 ? 'completed' : 'active';
+
+    $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ? AND user_id = ?")
+        ->execute([$newAmount, $status, $targetId, $userId]);
+
+    $mood = 'neutral';
+    if ($progress >= 100) $mood = 'celebrating';
+    elseif ($progress >= 70) $mood = 'happy';
+    elseif ($progress >= 40) $mood = 'neutral';
+    elseif ($progress > 0) $mood = 'sad';
+    else $mood = 'dirty';
+
+    $happiness = min(100, max(0, 50 + ($progress - 50)));
+    $pdo->prepare("UPDATE avatars SET mood = ?, happiness = ? WHERE target_id = ?")
+        ->execute([$mood, $happiness, $targetId]);
+}
+
+function getFinanceOverview($pdo, $userId)
+{
+    $monthStart = date('Y-m-01');
+    $today = date('Y-m-d');
+    $daysElapsed = max(1, (int)date('j'));
+    $daysInMonth = (int)date('t');
+
+    $stmt = $pdo->prepare("
+        SELECT category, SUM(amount) AS spent
+        FROM transactions
+        WHERE user_id = ? AND type = 'withdrawal' AND transaction_date BETWEEN ? AND ?
+        GROUP BY category
+    ");
+    $stmt->execute([$userId, $monthStart, $today]);
+    $spentRows = $stmt->fetchAll();
+    $spentByCategory = [];
+    foreach ($spentRows as $row) {
+        $spentByCategory[$row['category'] ?: 'General'] = (float)$row['spent'];
+    }
+
+    $budgets = getBudgetRows($pdo, $userId);
+    $budgetSummary = [];
+    foreach ($budgets as $budget) {
+        $spent = $spentByCategory[$budget['category']] ?? 0;
+        $limit = (float)$budget['monthly_limit'];
+        $budgetSummary[] = [
+            'id' => (int)$budget['id'],
+            'category' => $budget['category'],
+            'monthly_limit' => $limit,
+            'spent' => $spent,
+            'remaining' => max(0, $limit - $spent),
+            'percent' => $limit > 0 ? round(($spent / $limit) * 100, 1) : 0,
+            'status' => $limit > 0 && $spent >= $limit ? 'over' : ($limit > 0 && $spent >= $limit * 0.8 ? 'warning' : 'ok')
+        ];
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT
+            COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) AS saved,
+            COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0) AS spent
+        FROM transactions
+        WHERE user_id = ? AND transaction_date BETWEEN ? AND ?
+    ");
+    $stmt->execute([$userId, $monthStart, $today]);
+    $monthTotals = $stmt->fetch();
+    $monthSaved = (float)$monthTotals['saved'];
+    $monthSpent = (float)$monthTotals['spent'];
+    $projectedSpending = round(($monthSpent / $daysElapsed) * $daysInMonth, 2);
+
+    $stmt = $pdo->prepare("
+        SELECT *
+        FROM recurring_entries
+        WHERE user_id = ? AND is_active = 1
+        ORDER BY next_run_date ASC
+        LIMIT 8
+    ");
+    $stmt->execute([$userId]);
+    $recurring = $stmt->fetchAll();
+
+    $stmt = $pdo->prepare("
+        SELECT r.*, t.id AS transaction_id
+        FROM receipts r
+        LEFT JOIN transactions t
+            ON t.user_id = r.user_id
+            AND t.type = 'withdrawal'
+            AND t.amount = r.total_price
+            AND t.transaction_date = r.receipt_date
+            AND t.note LIKE CONCAT('Receipt: ', r.shop_name, '%')
+        WHERE r.user_id = ?
+        ORDER BY r.created_at DESC
+    ");
+    $stmt->execute([$userId]);
+    $receipts = $stmt->fetchAll();
+    foreach ($receipts as &$receipt) {
+        $receipt['items'] = json_decode($receipt['items'] ?? '[]', true);
+    }
+
+    $stmt = $pdo->prepare("
+        SELECT *
+        FROM targets
+        WHERE user_id = ? AND (category = 'Emergency' OR name LIKE '%emergency%')
+        ORDER BY status = 'active' DESC, created_at DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$userId]);
+    $emergency = $stmt->fetch();
+
+    $stmt = $pdo->prepare("SELECT active_target_id FROM users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $activeTargetId = $stmt->fetchColumn();
+    $activeTarget = null;
+    if ($activeTargetId) {
+        $stmt = $pdo->prepare("SELECT * FROM targets WHERE id = ? AND user_id = ?");
+        $stmt->execute([$activeTargetId, $userId]);
+        $activeTarget = $stmt->fetch();
+    }
+
+    $dailyNet = ($monthSaved - $monthSpent) / $daysElapsed;
+    $goalForecast = null;
+    if ($activeTarget) {
+        $remaining = max(0, (float)$activeTarget['target_amount'] - (float)$activeTarget['current_amount']);
+        $daysToGoal = $dailyNet > 0 ? (int)ceil($remaining / $dailyNet) : null;
+        $goalForecast = [
+            'target_name' => $activeTarget['name'],
+            'remaining' => $remaining,
+            'daily_net' => round($dailyNet, 2),
+            'days_to_goal' => $daysToGoal,
+            'estimated_date' => $daysToGoal ? date('Y-m-d', strtotime("+$daysToGoal days")) : null
+        ];
+    }
+
+    $claimsStmt = $pdo->prepare("SELECT mission_id FROM mission_claims WHERE user_id = ?");
+    $claimsStmt->execute([$userId]);
+    $claimed = array_flip(array_column($claimsStmt->fetchAll(), 'mission_id'));
+
+    $noShoppingDays = countNoSpendDays($pdo, $userId, 'Shopping', 3);
+    $missions = [
+        [
+            'id' => 'save_once_today_' . date('Ymd'),
+            'title' => 'Save once today',
+            'desc' => 'Record any savings deposit today.',
+            'progress' => hasTransactionToday($pdo, $userId, 'deposit') ? 1 : 0,
+            'target' => 1,
+            'reward' => 25
+        ],
+        [
+            'id' => 'no_shopping_3_' . date('YW'),
+            'title' => '3 days no shopping',
+            'desc' => 'Avoid Shopping expenses for 3 separate days this week.',
+            'progress' => $noShoppingDays,
+            'target' => 3,
+            'reward' => 60
+        ],
+        [
+            'id' => 'under_budget_' . date('Ym'),
+            'title' => 'Stay under every budget',
+            'desc' => 'Keep all monthly category budgets under 100%.',
+            'progress' => budgetsAreHealthy($budgetSummary) ? 1 : 0,
+            'target' => 1,
+            'reward' => 80
+        ]
+    ];
+
+    foreach ($missions as &$mission) {
+        $mission['completed'] = $mission['progress'] >= $mission['target'];
+        $mission['claimed'] = isset($claimed[$mission['id']]);
+    }
+
+    return [
+        'month' => [
+            'saved' => $monthSaved,
+            'spent' => $monthSpent,
+            'net' => $monthSaved - $monthSpent,
+            'projected_spending' => $projectedSpending
+        ],
+        'budgets' => $budgetSummary,
+        'recurring' => $recurring,
+        'forecast' => $goalForecast,
+        'missions' => $missions,
+        'receipts' => $receipts,
+        'emergency' => $emergency,
+        'export_url' => 'finance/export'
+    ];
+}
+
+function hasTransactionToday($pdo, $userId, $type)
+{
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM transactions WHERE user_id = ? AND type = ? AND transaction_date = CURDATE()");
+    $stmt->execute([$userId, $type]);
+    return (int)$stmt->fetchColumn() > 0;
+}
+
+function countNoSpendDays($pdo, $userId, $category, $targetDays)
+{
+    $start = date('Y-m-d', strtotime('monday this week'));
+    $today = date('Y-m-d');
+    $stmt = $pdo->prepare("
+        SELECT COUNT(DISTINCT transaction_date)
+        FROM transactions
+        WHERE user_id = ? AND type = 'withdrawal' AND category = ? AND transaction_date BETWEEN ? AND ?
+    ");
+    $stmt->execute([$userId, $category, $start, $today]);
+    $shoppingDays = (int)$stmt->fetchColumn();
+    $daysElapsed = max(1, floor((strtotime($today) - strtotime($start)) / 86400) + 1);
+    return min($targetDays, max(0, $daysElapsed - $shoppingDays));
+}
+
+function budgetsAreHealthy($budgetSummary)
+{
+    if (!$budgetSummary) {
+        return false;
+    }
+
+    foreach ($budgetSummary as $budget) {
+        if ($budget['monthly_limit'] > 0 && $budget['spent'] > $budget['monthly_limit']) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 function checkAchievements($pdo, $userId)
 {
 

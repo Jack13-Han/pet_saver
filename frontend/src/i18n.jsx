@@ -451,6 +451,233 @@ const DICTIONARIES = {
   },
 };
 
+const FEATURE_TRANSLATIONS = {
+  ja: {
+    Planner: "プランナー",
+    "Money Planner": "お金プランナー",
+    "Budgets, recurring money, missions, forecasts, receipts, and export in one place": "予算、定期支出、ミッション、予測、レシート、エクスポートを一か所で管理",
+    "Export CSV": "CSV出力",
+    "This Month Spent": "今月の支出",
+    "This Month Saved": "今月の貯金",
+    "Month-End Estimate": "月末予想",
+    "Emergency Fund": "緊急資金",
+    "Not set": "未設定",
+    "Budget Limits": "予算上限",
+    "Monthly limit": "月の上限",
+    "Save": "保存",
+    "Add category budgets to unlock automatic warnings.": "カテゴリ予算を追加すると自動警告が使えます。",
+    "Recurring Savings and Expenses": "定期的な貯金と支出",
+    "Due items run automatically when you open the app. Delete a recurring item when a subscription or payment stops.": "期限が来た項目はアプリを開くと自動で記録されます。支払いを止めたら定期項目を削除してください。",
+    Name: "名前",
+    Amount: "金額",
+    Expense: "支出",
+    Savings: "貯金",
+    Monthly: "毎月",
+    Weekly: "毎週",
+    "Active goal": "現在の目標",
+    Add: "追加",
+    "No recurring entries yet.": "定期項目はまだありません。",
+    "Delete this recurring item?": "この定期項目を削除しますか？",
+    "AI Spending Coach": "AI支出コーチ",
+    "Goal Forecast": "目標予測",
+    Missions: "ミッション",
+    Claimed: "受け取り済み",
+    "Receipt History": "レシート履歴",
+    "No scanned receipts yet.": "スキャン済みレシートはまだありません。",
+    "Unknown Shop": "不明な店",
+    "Scanned receipts will appear here.": "スキャンしたレシートがここに表示されます。",
+    "budget is over limit": "予算上限を超えています",
+    "is close to the limit": "上限に近づいています",
+    "You spent {spent} against {limit}. Freeze non-essential {category} spending first.": "{limit} に対して {spent} 使いました。まず不要な {category} 支出を止めましょう。",
+    "You are at {percent}%. Keep the next few purchases small to finish the month cleanly.": "現在 {percent}% です。月末まで次の買い物を小さく抑えましょう。",
+    "Goal path looks measurable": "目標までの道筋が見えています",
+    "At this pace, {goal} can finish around {date}.": "このペースなら {goal} は {date} ごろ達成できます。",
+    "Build the next useful signal": "次の有用なサインを作りましょう",
+    "{days} days": "{days}日",
+    "Needs savings pace": "貯金ペースが必要です",
+    "Remaining {amount} for {goal}.": "{goal} まで残り {amount}。",
+    "Create an active goal to see a forecast.": "予測を見るには有効な目標を作成してください。",
+    "Save once today": "今日1回貯金する",
+    "Record any savings deposit today.": "今日、貯金の入金を記録しましょう。",
+    "3 days no shopping": "3日間買い物なし",
+    "Avoid Shopping expenses for 3 separate days this week.": "今週3日間、買い物支出を避けましょう。",
+    "Stay under every budget": "すべての予算内に収める",
+    "Keep all monthly category budgets under 100%.": "すべての月間カテゴリ予算を100%未満に保ちましょう。",
+    "Claim {coins} coins": "{coins}コインを受け取る",
+    "next": "次回",
+    weekly: "毎週",
+    monthly: "毎月",
+  },
+  ko: {
+    Planner: "플래너",
+    "Money Planner": "머니 플래너",
+    "Budgets, recurring money, missions, forecasts, receipts, and export in one place": "예산, 반복 지출, 미션, 예측, 영수증, 내보내기를 한곳에서 관리",
+    "Export CSV": "CSV 내보내기",
+    "This Month Spent": "이번 달 지출",
+    "This Month Saved": "이번 달 저축",
+    "Month-End Estimate": "월말 예상",
+    "Emergency Fund": "비상금",
+    "Not set": "미설정",
+    "Budget Limits": "예산 한도",
+    "Monthly limit": "월 한도",
+    "Save": "저장",
+    "Add category budgets to unlock automatic warnings.": "카테고리 예산을 추가하면 자동 경고를 사용할 수 있습니다.",
+    "Recurring Savings and Expenses": "반복 저축 및 지출",
+    "Due items run automatically when you open the app. Delete a recurring item when a subscription or payment stops.": "기한이 된 항목은 앱을 열 때 자동으로 기록됩니다. 구독이나 결제가 중지되면 반복 항목을 삭제하세요.",
+    Name: "이름",
+    Amount: "금액",
+    Expense: "지출",
+    Savings: "저축",
+    Monthly: "매월",
+    Weekly: "매주",
+    "Active goal": "현재 목표",
+    Add: "추가",
+    "No recurring entries yet.": "반복 항목이 아직 없습니다.",
+    "Delete this recurring item?": "이 반복 항목을 삭제할까요?",
+    "AI Spending Coach": "AI 지출 코치",
+    "Goal Forecast": "목표 예측",
+    Missions: "미션",
+    Claimed: "수령 완료",
+    "Receipt History": "영수증 기록",
+    "No scanned receipts yet.": "스캔한 영수증이 아직 없습니다.",
+    "Unknown Shop": "알 수 없는 상점",
+    "Scanned receipts will appear here.": "스캔한 영수증이 여기에 표시됩니다.",
+    "budget is over limit": "예산 한도를 넘었습니다",
+    "is close to the limit": "한도에 가까워졌습니다",
+    "You spent {spent} against {limit}. Freeze non-essential {category} spending first.": "{limit} 중 {spent}을 사용했습니다. 먼저 불필요한 {category} 지출을 멈추세요.",
+    "You are at {percent}%. Keep the next few purchases small to finish the month cleanly.": "현재 {percent}%입니다. 이번 달을 잘 마무리하려면 다음 지출을 작게 유지하세요.",
+    "Goal path looks measurable": "목표 달성 경로가 보입니다",
+    "At this pace, {goal} can finish around {date}.": "이 속도라면 {goal}은 {date}쯤 완료할 수 있습니다.",
+    "Build the next useful signal": "다음 유용한 신호를 만들어보세요",
+    "{days} days": "{days}일",
+    "Needs savings pace": "저축 속도가 필요합니다",
+    "Remaining {amount} for {goal}.": "{goal}까지 {amount} 남았습니다.",
+    "Create an active goal to see a forecast.": "예측을 보려면 활성 목표를 만드세요.",
+    "Save once today": "오늘 한 번 저축하기",
+    "Record any savings deposit today.": "오늘 저축 입금을 기록하세요.",
+    "3 days no shopping": "3일 쇼핑 안 하기",
+    "Avoid Shopping expenses for 3 separate days this week.": "이번 주 3일 동안 쇼핑 지출을 피하세요.",
+    "Stay under every budget": "모든 예산 안에 머무르기",
+    "Keep all monthly category budgets under 100%.": "모든 월간 카테고리 예산을 100% 아래로 유지하세요.",
+    "Claim {coins} coins": "{coins}코인 받기",
+    "next": "다음",
+    weekly: "매주",
+    monthly: "매월",
+  },
+  my: {
+    Planner: "အစီအစဉ်",
+    "Money Planner": "ငွေကြေး အစီအစဉ်",
+    "Budgets, recurring money, missions, forecasts, receipts, and export in one place": "Budget, ထပ်ခါထပ်ခါ ဝင်/ထွက်ငွေ, mission, ခန့်မှန်းချက်, receipt နဲ့ export ကိုတစ်နေရာတည်းမှာ စီမံပါ",
+    "Export CSV": "CSV ထုတ်ရန်",
+    "This Month Spent": "ဒီလ သုံးငွေ",
+    "This Month Saved": "ဒီလ စုငွေ",
+    "Month-End Estimate": "လကုန် ခန့်မှန်းငွေ",
+    "Emergency Fund": "အရေးပေါ်ငွေ",
+    "Not set": "မသတ်မှတ်ရသေးပါ",
+    "Budget Limits": "Budget ကန့်သတ်ချက်",
+    "Monthly limit": "လစဉ် ကန့်သတ်ငွေ",
+    "Save": "သိမ်းရန်",
+    "Add category budgets to unlock automatic warnings.": "အလိုအလျောက် warning ပြစေရန် category budget ထည့်ပါ။",
+    "Recurring Savings and Expenses": "အလိုအလျောက် ထပ်ခါထပ်ခါ စုငွေ/သုံးငွေ",
+    "Due items run automatically when you open the app. Delete a recurring item when a subscription or payment stops.": "App ဖွင့်တဲ့အချိန် due ဖြစ်နေတဲ့ item တွေကို အလိုအလျောက် မှတ်တမ်းထည့်မယ်။ Subscription/payment ရပ်သွားရင် recurring item ကိုဖျက်ပါ။",
+    Name: "အမည်",
+    Amount: "ငွေပမာဏ",
+    Expense: "သုံးငွေ",
+    Savings: "စုငွေ",
+    Monthly: "လစဉ်",
+    Weekly: "အပတ်စဉ်",
+    "Active goal": "လက်ရှိ goal",
+    Add: "ထည့်ရန်",
+    "No recurring entries yet.": "Recurring item မရှိသေးပါ။",
+    "Delete this recurring item?": "ဒီ recurring item ကိုဖျက်မလား?",
+    "AI Spending Coach": "AI သုံးငွေ အကြံပေး",
+    "Goal Forecast": "Goal ခန့်မှန်းချက်",
+    Missions: "Mission များ",
+    Claimed: "ရယူပြီး",
+    "Receipt History": "Receipt မှတ်တမ်း",
+    "No scanned receipts yet.": "Scan လုပ်ထားတဲ့ receipt မရှိသေးပါ။",
+    "Unknown Shop": "ဆိုင်အမည်မသိ",
+    "Scanned receipts will appear here.": "Scan လုပ်ထားတဲ့ receipt တွေဒီမှာပေါ်မယ်။",
+    "budget is over limit": "budget ကန့်သတ်ချက် ကျော်နေပါပြီ",
+    "is close to the limit": "ကန့်သတ်ချက်နား ရောက်နေပါပြီ",
+    "You spent {spent} against {limit}. Freeze non-essential {category} spending first.": "{limit} ထဲက {spent} သုံးထားပါတယ်။ မလိုအပ်တဲ့ {category} spending ကိုအရင်ရပ်ပါ။",
+    "You are at {percent}%. Keep the next few purchases small to finish the month cleanly.": "အခု {percent}% ရောက်နေပါပြီ။ ဒီလကုန်အထိ သုံးငွေကိုနည်းနည်းလျှော့ထားပါ။",
+    "Goal path looks measurable": "Goal ရောက်ဖို့လမ်းကြောင်း ခန့်မှန်းလို့ရနေပါပြီ",
+    "At this pace, {goal} can finish around {date}.": "ဒီနှုန်းနဲ့ဆို {goal} ကို {date} လောက်မှာပြီးနိုင်ပါတယ်။",
+    "Build the next useful signal": "နောက်ထပ် အသုံးဝင်တဲ့ signal တစ်ခုထည့်ပါ",
+    "{days} days": "{days} ရက်",
+    "Needs savings pace": "စုငွေ pace လိုအပ်နေပါတယ်",
+    "Remaining {amount} for {goal}.": "{goal} အတွက် {amount} ကျန်ပါတယ်။",
+    "Create an active goal to see a forecast.": "Forecast ကြည့်ဖို့ active goal တစ်ခုဖန်တီးပါ။",
+    "Save once today": "ဒီနေ့ တစ်ကြိမ်စုပါ",
+    "Record any savings deposit today.": "ဒီနေ့ savings deposit တစ်ခုမှတ်တမ်းထည့်ပါ။",
+    "3 days no shopping": "၃ ရက် shopping မလုပ်ပါ",
+    "Avoid Shopping expenses for 3 separate days this week.": "ဒီအပတ်ထဲ ၃ ရက် Shopping expense ကိုရှောင်ပါ။",
+    "Stay under every budget": "Budget အားလုံး မကျော်အောင်နေပါ",
+    "Keep all monthly category budgets under 100%.": "လစဉ် category budget အားလုံးကို 100% အောက်ထားပါ။",
+    "Claim {coins} coins": "{coins} coins ရယူရန်",
+    "next": "နောက်တစ်ကြိမ်",
+    weekly: "အပတ်စဉ်",
+    monthly: "လစဉ်",
+  },
+  zh: {
+    Planner: "规划",
+    "Money Planner": "资金规划",
+    "Budgets, recurring money, missions, forecasts, receipts, and export in one place": "在一个页面管理预算、周期收支、任务、预测、收据和导出",
+    "Export CSV": "导出 CSV",
+    "This Month Spent": "本月支出",
+    "This Month Saved": "本月储蓄",
+    "Month-End Estimate": "月底预估",
+    "Emergency Fund": "应急基金",
+    "Not set": "未设置",
+    "Budget Limits": "预算上限",
+    "Monthly limit": "月度上限",
+    "Save": "保存",
+    "Add category budgets to unlock automatic warnings.": "添加分类预算即可启用自动提醒。",
+    "Recurring Savings and Expenses": "周期储蓄与支出",
+    "Due items run automatically when you open the app. Delete a recurring item when a subscription or payment stops.": "到期项目会在打开应用时自动记录。订阅或付款停止时，请删除对应周期项目。",
+    Name: "名称",
+    Amount: "金额",
+    Expense: "支出",
+    Savings: "储蓄",
+    Monthly: "每月",
+    Weekly: "每周",
+    "Active goal": "当前目标",
+    Add: "添加",
+    "No recurring entries yet.": "还没有周期项目。",
+    "Delete this recurring item?": "要删除这个周期项目吗？",
+    "AI Spending Coach": "AI 支出教练",
+    "Goal Forecast": "目标预测",
+    Missions: "任务",
+    Claimed: "已领取",
+    "Receipt History": "收据历史",
+    "No scanned receipts yet.": "还没有扫描的收据。",
+    "Unknown Shop": "未知商店",
+    "Scanned receipts will appear here.": "扫描的收据会显示在这里。",
+    "budget is over limit": "已超过预算上限",
+    "is close to the limit": "接近预算上限",
+    "You spent {spent} against {limit}. Freeze non-essential {category} spending first.": "预算 {limit} 中已花费 {spent}。请先暂停非必要的 {category} 支出。",
+    "You are at {percent}%. Keep the next few purchases small to finish the month cleanly.": "目前已达到 {percent}%。请控制接下来的消费，以便顺利结束本月。",
+    "Goal path looks measurable": "目标进度可以预测",
+    "At this pace, {goal} can finish around {date}.": "按这个速度，{goal} 大约可在 {date} 完成。",
+    "Build the next useful signal": "建立下一个有用信号",
+    "{days} days": "{days}天",
+    "Needs savings pace": "需要储蓄节奏",
+    "Remaining {amount} for {goal}.": "{goal} 还剩 {amount}。",
+    "Create an active goal to see a forecast.": "创建一个有效目标即可查看预测。",
+    "Save once today": "今天储蓄一次",
+    "Record any savings deposit today.": "今天记录一笔储蓄。",
+    "3 days no shopping": "3天不购物",
+    "Avoid Shopping expenses for 3 separate days this week.": "本周任选3天避免购物支出。",
+    "Stay under every budget": "保持所有预算不超支",
+    "Keep all monthly category budgets under 100%.": "让所有月度分类预算保持在100%以下。",
+    "Claim {coins} coins": "领取 {coins} 个金币",
+    "next": "下次",
+    weekly: "每周",
+    monthly: "每月",
+  },
+};
+
 const LanguageContext = createContext(null);
 
 const textNodeOriginals = new WeakMap();
@@ -464,6 +691,9 @@ function preserveSpacing(original, translated) {
 
 function translateDynamic(text, dict) {
   const trimmed = text.trim();
+  const fill = (template, values) =>
+    Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{${key}}`, value), template);
+
   const levelMatch = trimmed.match(/^Level (.+)$/);
   if (levelMatch) return preserveSpacing(text, `${dict.Level || "Level"} ${levelMatch[1]}`);
 
@@ -480,13 +710,66 @@ function translateDynamic(text, dict) {
     return preserveSpacing(text, `${dict["Take Care of"] || "Take Care of"} ${trimmed.replace("Take Care of ", "")}`);
   }
 
+  const overBudgetMatch = trimmed.match(/^(.+) budget is over limit$/);
+  if (overBudgetMatch) return preserveSpacing(text, `${overBudgetMatch[1]} ${dict["budget is over limit"] || "budget is over limit"}`);
+
+  const warningBudgetMatch = trimmed.match(/^(.+) is close to the limit$/);
+  if (warningBudgetMatch) return preserveSpacing(text, `${warningBudgetMatch[1]} ${dict["is close to the limit"] || "is close to the limit"}`);
+
+  const spentAgainstMatch = trimmed.match(/^You spent (.+) against (.+)\. Freeze non-essential (.+) spending first\.$/);
+  if (spentAgainstMatch && dict["You spent {spent} against {limit}. Freeze non-essential {category} spending first."]) {
+    return preserveSpacing(text, fill(dict["You spent {spent} against {limit}. Freeze non-essential {category} spending first."], {
+      spent: spentAgainstMatch[1],
+      limit: spentAgainstMatch[2],
+      category: spentAgainstMatch[3],
+    }));
+  }
+
+  const percentMatch = trimmed.match(/^You are at (.+)%\. Keep the next few purchases small to finish the month cleanly\.$/);
+  if (percentMatch && dict["You are at {percent}%. Keep the next few purchases small to finish the month cleanly."]) {
+    return preserveSpacing(text, fill(dict["You are at {percent}%. Keep the next few purchases small to finish the month cleanly."], {
+      percent: percentMatch[1],
+    }));
+  }
+
+  const paceMatch = trimmed.match(/^At this pace, (.+) can finish around (.+)\.$/);
+  if (paceMatch && dict["At this pace, {goal} can finish around {date}."]) {
+    return preserveSpacing(text, fill(dict["At this pace, {goal} can finish around {date}."], {
+      goal: paceMatch[1],
+      date: paceMatch[2],
+    }));
+  }
+
+  const compactDaysMatch = trimmed.match(/^(\d+) days$/);
+  if (compactDaysMatch && dict["{days} days"]) {
+    return preserveSpacing(text, fill(dict["{days} days"], { days: compactDaysMatch[1] }));
+  }
+
+  const remainingMatch = trimmed.match(/^Remaining (.+) for (.+)\.$/);
+  if (remainingMatch && dict["Remaining {amount} for {goal}."]) {
+    return preserveSpacing(text, fill(dict["Remaining {amount} for {goal}."], {
+      amount: remainingMatch[1],
+      goal: remainingMatch[2],
+    }));
+  }
+
+  const claimCoinsMatch = trimmed.match(/^Claim (\d+) coins$/);
+  if (claimCoinsMatch && dict["Claim {coins} coins"]) {
+    return preserveSpacing(text, fill(dict["Claim {coins} coins"], { coins: claimCoinsMatch[1] }));
+  }
+
+  const recurringMetaMatch = trimmed.match(/^(weekly|monthly)\s+.+\s+next\s+(.+)\s+.+\s+(.+)$/);
+  if (recurringMetaMatch) {
+    return preserveSpacing(text, `${dict[recurringMetaMatch[1]] || recurringMetaMatch[1]} · ${dict.next || "next"} ${recurringMetaMatch[2]} · ${recurringMetaMatch[3]}`);
+  }
+
   return null;
 }
 
 function translateText(text, language) {
   if (language === "en") return text;
 
-  const dict = DICTIONARIES[language] || {};
+  const dict = { ...(DICTIONARIES[language] || {}), ...(FEATURE_TRANSLATIONS[language] || {}) };
   const trimmed = text.trim();
   if (!trimmed) return text;
 

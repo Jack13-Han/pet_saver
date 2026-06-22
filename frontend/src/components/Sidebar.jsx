@@ -1,13 +1,14 @@
 import React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
-import { Home, Target, Receipt, ShoppingBag, Trophy, Camera, Medal, Settings, LogOut, Flame, X, BarChart3 } from 'lucide-react'
+import { Home, Target, Receipt, ShoppingBag, Trophy, Camera, Medal, Settings, LogOut, Flame, X, BarChart3, WalletCards } from 'lucide-react'
 
 const navItems = [
   { path: '/', icon: Home, label: 'Home' },
   { path: '/goals', icon: Target, label: 'Goals' },
   { path: '/transactions', icon: Receipt, label: 'Expenses' },
   { path: '/insights', icon: BarChart3, label: 'Insights' },
+  { path: '/planner', icon: WalletCards, label: 'Planner' },
   { path: '/expense-analyst', icon: Flame, label: 'Expense Analyst' },
   { path: '/scanner', icon: Camera, label: 'Receipt Scanner' },
   { path: '/shop', icon: ShoppingBag, label: 'Shop' },

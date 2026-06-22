@@ -166,6 +166,47 @@ CREATE TABLE
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
     );
 
+CREATE TABLE
+    budgets (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        category VARCHAR(50) NOT NULL,
+        monthly_limit DECIMAL(15, 2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_user_budget_category (user_id, category),
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    );
+
+CREATE TABLE
+    recurring_entries (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        target_id INT DEFAULT NULL,
+        name VARCHAR(100) NOT NULL,
+        amount DECIMAL(15, 2) NOT NULL,
+        type ENUM ('deposit', 'withdrawal') NOT NULL,
+        category VARCHAR(50) DEFAULT 'General',
+        frequency ENUM ('weekly', 'monthly') DEFAULT 'monthly',
+        next_run_date DATE NOT NULL,
+        last_run_date DATE DEFAULT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+        FOREIGN KEY (target_id) REFERENCES targets (id) ON DELETE SET NULL
+    );
+
+CREATE TABLE
+    mission_claims (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        mission_id VARCHAR(80) NOT NULL,
+        reward_coins INT NOT NULL DEFAULT 0,
+        claimed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_user_mission (user_id, mission_id),
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    );
+
 -- Default Accessories
 INSERT INTO
     accessories (

@@ -1,13 +1,28 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, ScanLine, Check, X, Sparkles, FileText, Store, DollarSign, Calendar, Tag, Info } from 'lucide-react'
+import { Upload, ScanLine, Check, X, Sparkles, FileText, Store, DollarSign, Calendar, Tag, Info, Receipt } from 'lucide-react'
 import { receipts as receiptApi, targets as targetApi } from '../api.js'
 
 // 1. Import Google Generative AI SDK
-import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // ⚠️ API Key configuration using Vite environment variables
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
+
+const genAI = {
+  getGenerativeModel: () => ({
+    generateContent: async ([, imagePart]) => {
+      const response = await receiptApi.scan({
+        image: imagePart.inlineData.data,
+        mime_type: imagePart.inlineData.mimeType,
+      })
+
+      return {
+        response: {
+          text: () => JSON.stringify(response.data || {}),
+        },
+      }
+    },
+  }),
+}
 
 // Helper function to convert file to Base64 format readable by Gemini
 const fileToGenerativePart = async (file) => {
@@ -91,7 +106,6 @@ export const realOCR = async (file) => {
 
       // If retries are exhausted, fallback to default parsing values
       console.error("Gemini Image Parsing Final Error:", err);
-      alert("AI parsing is temporarily unavailable due to high server traffic. Please try again in a few moments.");
       
       return {
         shop_name: 'Unknown Shop',
@@ -99,7 +113,8 @@ export const realOCR = async (file) => {
         date: today,
         category: 'Shopping',
         items: [{ name: 'お会計 / 合計', price: 0 }],
-        confidence: 31 
+        confidence: 31,
+        scan_error: err.message || 'AI scan failed. Please enter the receipt details manually.'
       };
     }
   }
@@ -110,16 +125,28 @@ export default function ReceiptScanner() {
   const [scanning, setScanning] = useState(false)
   const [result, setResult] = useState(null)
   const [targets, setTargets] = useState([])
+  const [receipts, setReceipts] = useState([])
   const [selectedTarget, setSelectedTarget] = useState('')
   const [saving, setSaving] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef(null)
 
   React.useEffect(() => {
-    targetApi.list('active')
-      .then(res => setTargets(res.data || []))
-      .catch(err => console.error(err))
+    loadInitialData()
   }, [])
+
+  const loadInitialData = async () => {
+    try {
+      const [targetRes, receiptRes] = await Promise.all([
+        targetApi.list('active'),
+        receiptApi.list(),
+      ])
+      setTargets(targetRes.data || [])
+      setReceipts(receiptRes.data || [])
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   const handleFile = useCallback(async (file) => {
     if (!file) return
@@ -136,7 +163,16 @@ export default function ReceiptScanner() {
       setResult(ocrResult)
     } catch (err) {
       console.error(err)
-      alert('OCR failed')
+      const today = new Date().toISOString().split('T')[0]
+      setResult({
+        shop_name: 'Unknown Shop',
+        total_price: 0,
+        date: today,
+        category: 'Shopping',
+        items: [{ name: 'Manual entry', price: 0 }],
+        confidence: 31,
+        scan_error: err.message || 'OCR failed. Please enter the receipt details manually.',
+      })
     } finally {
       setScanning(false)
     }
@@ -172,6 +208,7 @@ export default function ReceiptScanner() {
       setImage(null)
       setResult(null)
       setSelectedTarget('')
+      loadInitialData()
     } catch (err) {
       console.error(err)
       alert(err.message || 'Failed')
@@ -309,9 +346,15 @@ export default function ReceiptScanner() {
                     <span className="font-extrabold text-sm">
                       {result.confidence === 100 
                         ? `Expense Detected via Gemini AI (Confidence: ${result.confidence}%)` 
-                        : "AI Parsing Failed. Using Default Values."}
+                        : "AI scan could not read this receipt. Please enter the details manually."}
                     </span>
                   </div>
+                  {result.scan_error && (
+                    <div className="flex items-center gap-2 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-600 text-xs font-semibold">
+                      <Info size={14} className="flex-shrink-0" />
+                      <span>{result.scan_error}</span>
+                    </div>
+                  )}
 
                   {/* Form Details */}
                   <div className="space-y-5">
@@ -460,6 +503,44 @@ export default function ReceiptScanner() {
             </motion.div>
           )}
         </AnimatePresence>
+      </div>
+
+      <div className="card" style={{ marginTop: 24 }}>
+        <div className="card-header">
+          <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Receipt size={20} color="#EF4444" />
+            Receipt History
+          </h3>
+        </div>
+
+        {receipts.length === 0 ? (
+          <div style={{ padding: 24, border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)', fontWeight: 700, textAlign: 'center' }}>
+            No scanned receipts yet.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 12 }}>
+            {receipts.map((receipt) => (
+              <div key={receipt.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'center', padding: 14, border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: '#fff' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {receipt.shop_name || 'Unknown Shop'}
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 700, marginTop: 4 }}>
+                    {receipt.receipt_date || receipt.created_at?.slice(0, 10)} · {receipt.category || 'Shopping'}
+                  </div>
+                  {Array.isArray(receipt.items) && receipt.items.length > 0 && (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 12, fontWeight: 650, marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {receipt.items.map(item => item.name).join(', ')}
+                    </div>
+                  )}
+                </div>
+                <div style={{ fontWeight: 950, color: '#EF4444', whiteSpace: 'nowrap' }}>
+                  ﾂ･{Number(receipt.total_price || 0).toLocaleString()}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
