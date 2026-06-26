@@ -14,8 +14,9 @@ import {
   Trophy,
   WalletCards,
 } from 'lucide-react'
-import { budgets as budgetApi, finance, recurring as recurringApi, targets as targetApi } from '../api.js'
+import { budgets as budgetApi, finance, recurring as recurringApi, targets as targetApi, transactions as transactionApi } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import { useLanguage } from '../i18n.jsx'
 
 const categories = ['Food', 'Shopping', 'Transport', 'Entertainment', 'Education', 'Emergency', 'General', 'Other']
 
@@ -29,11 +30,14 @@ const cardStyle = {
 }
 
 export default function Planner() {
+  const { language } = useLanguage()
   const [overview, setOverview] = useState(null)
   const [targets, setTargets] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [budgetForm, setBudgetForm] = useState({ category: 'Food', monthly_limit: '' })
+  const [emergencyForm, setEmergencyForm] = useState({ target_amount: '' })
+  const [emergencyDeposit, setEmergencyDeposit] = useState({ amount: '' })
   const [recurringForm, setRecurringForm] = useState({
     name: '',
     amount: '',
@@ -99,6 +103,50 @@ export default function Planner() {
       })
       setBudgetForm({ ...budgetForm, monthly_limit: '' })
       await loadPlanner()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const createEmergencyFund = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await targetApi.create({
+        name: 'Emergency Fund',
+        description: 'Backup savings for urgent costs',
+        target_amount: Number(emergencyForm.target_amount || 0),
+        category: 'Emergency',
+        deadline: null,
+        avatar_type: 'dog',
+        avatar_name: 'Mochi',
+      })
+      setEmergencyForm({ target_amount: '' })
+      await loadPlanner()
+    } catch (err) {
+      alert(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const addEmergencyMoney = async (e) => {
+    e.preventDefault()
+    if (!overview?.emergency?.id) return
+    setSaving(true)
+    try {
+      await transactionApi.create({
+        target_id: overview.emergency.id,
+        amount: Number(emergencyDeposit.amount || 0),
+        type: 'deposit',
+        category: 'Emergency',
+        note: 'Emergency fund deposit',
+        date: new Date().toISOString().slice(0, 10),
+      })
+      setEmergencyDeposit({ amount: '' })
+      await loadPlanner()
+    } catch (err) {
+      alert(err.message)
     } finally {
       setSaving(false)
     }
@@ -182,6 +230,50 @@ export default function Planner() {
         <SummaryCard icon={LineChart} label="Month-End Estimate" value={money(overview?.month?.projected_spending)} tone="#4D96FF" />
         <SummaryCard icon={ShieldCheck} label="Emergency Fund" value={overview?.emergency ? money(overview.emergency.current_amount) : 'Not set'} tone="#f59e0b" />
       </div>
+
+      <section className="card" style={{ ...cardStyle, marginBottom: 20 }}>
+        <SectionTitle icon={ShieldCheck} title="Emergency Fund" />
+        {overview?.emergency ? (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 850, marginBottom: 8 }}>
+              <span>{overview.emergency.name}</span>
+              <span>{money(overview.emergency.current_amount)} / {money(overview.emergency.target_amount)}</span>
+            </div>
+            <div style={{ height: 8, background: 'var(--bg-primary)', borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(100, overview.emergency.progress || 0)}%`, height: '100%', background: '#f59e0b' }} />
+            </div>
+            <form onSubmit={addEmergencyMoney} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12, marginTop: 14 }}>
+              <input
+                className="form-input"
+                type="number"
+                min="1"
+                placeholder="Add money"
+                value={emergencyDeposit.amount}
+                onChange={(e) => setEmergencyDeposit({ amount: e.target.value })}
+                required
+              />
+              <button className="btn btn-primary" disabled={saving}>
+                <Plus size={16} /> Add Money
+              </button>
+            </form>
+          </div>
+        ) : (
+          <form onSubmit={createEmergencyFund} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 }}>
+            <input
+              className="form-input"
+              type="number"
+              min="1"
+              placeholder="Emergency target"
+              value={emergencyForm.target_amount}
+              onChange={(e) => setEmergencyForm({ target_amount: e.target.value })}
+              required
+            />
+            <button className="btn btn-primary" disabled={saving}>
+              <Plus size={16} /> Create
+            </button>
+          </form>
+        )}
+      </section>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: 20 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -278,9 +370,15 @@ export default function Planner() {
             <SectionTitle icon={LineChart} title="Goal Forecast" />
             {overview?.forecast ? (
               <div>
-                <div style={{ fontSize: 28, fontWeight: 950 }}>{overview.forecast.days_to_goal ? `${overview.forecast.days_to_goal} days` : 'Needs savings pace'}</div>
+                <div style={{ fontSize: 28, fontWeight: 950 }}>
+                  {overview.forecast.days_to_goal
+                    ? language === 'ja' ? `${overview.forecast.days_to_goal}日` : `${overview.forecast.days_to_goal} days`
+                    : language === 'ja' ? '貯金ペースが必要です' : 'Needs savings pace'}
+                </div>
                 <p style={{ color: 'var(--text-secondary)', fontWeight: 650 }}>
-                  Remaining {money(overview.forecast.remaining)} for {overview.forecast.target_name}.
+                  {language === 'ja'
+                    ? `${overview.forecast.target_name}まで残り¥${Number(overview.forecast.remaining || 0).toLocaleString()}です。`
+                    : `Remaining ${money(overview.forecast.remaining)} for ${overview.forecast.target_name}.`}
                 </p>
               </div>
             ) : <EmptyLine text="Create an active goal to see a forecast." />}
