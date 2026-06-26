@@ -27,6 +27,7 @@ import {
   calendar as calendarApi,
 } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useLanguage } from "../i18n.jsx";
 import { realOCR } from "./ReceiptScanner.jsx";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { avatarEmojis, avatarTypes, getPetImageForTarget } from "../petAssets.js";
@@ -61,6 +62,7 @@ export default function Dashboard() {
   const [deletingExpiredGoal, setDeletingExpiredGoal] = useState(false);
   const fileInputRef = useRef(null);
   const { user, updateUser } = useAuth();
+  const { language } = useLanguage();
   const navigate = useNavigate();
 
   const handleReceiptUpload = async (e) => {
@@ -98,6 +100,17 @@ export default function Dashboard() {
     target && !showExpiredGoal && target.deadline && progress < 100 && daysUntilDeadline !== null && daysUntilDeadline >= 0 && daysUntilDeadline <= 3;
   const careActionsRemaining = target?.care_actions_remaining ?? 3;
   const careLimitReached = careActionsRemaining <= 0;
+  const todayKey = new Date().toISOString().split("T")[0];
+  const savedToday = (data?.transactions || []).some((tx) => (
+    tx.type === "deposit" &&
+    String(tx.transaction_date || "").slice(0, 10) === todayKey
+  ));
+  const targetRemaining = target
+    ? Math.max(0, Number(target.target_amount || 0) - Number(target.current_amount || 0))
+    : 0;
+  const petSavingAmount = targetRemaining > 0
+    ? Math.max(100, Math.min(500, Math.ceil(targetRemaining / 10)))
+    : 100;
   const shopPreview = (data?.shopPreview || []).filter(item => !['glasses', 'scarf'].includes(item.category));
   const getShopPreviewIcon = (item) => {
     if (item.avatar_type) return avatarTypes.find(type => type.id === item.avatar_type)?.emoji || item.icon;
@@ -233,6 +246,28 @@ export default function Dashboard() {
     } catch (err) {
       showToast(err.message || "Transaction failed", "error");
       return false;
+    }
+  };
+
+  const handlePetSavingMission = async () => {
+    if (!data?.activeTarget) return;
+
+    try {
+      await txApi.create({
+        target_id: data.activeTarget.id,
+        amount: petSavingAmount,
+        type: "deposit",
+        category: "Pet Saving",
+        note: `Pet Saving ﾂｷ Daily mission for ${data.activeTarget.avatar_name || data.activeTarget.name}`,
+        date: new Date().toISOString().split("T")[0],
+      });
+
+      setAnimatingPet(true);
+      setTimeout(() => setAnimatingPet(false), 1000);
+      showToast(`Pet mission complete! Saved ﾂ･${petSavingAmount.toLocaleString()} for ${data.activeTarget.avatar_name}.`);
+      loadDashboard();
+    } catch (err) {
+      showToast(err.message || "Pet saving mission failed", "error");
     }
   };
 
@@ -520,6 +555,51 @@ export default function Dashboard() {
                   </div>
                   <span className="pet-stat-value">{target.fullness}/100</span>
                 </div>
+              </div>
+
+              <div
+                style={{
+                  marginTop: 18,
+                  padding: 16,
+                  border: "1px solid rgba(16, 185, 129, 0.22)",
+                  borderRadius: 12,
+                  background: savedToday
+                    ? "linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)"
+                    : "linear-gradient(135deg, #fff7ed 0%, #ffffff 100%)",
+                  display: "grid",
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 900, color: savedToday ? "#047857" : "#c2410c", marginBottom: 4 }}>
+                      {language === "ja" ? "本日のペット貯金ミッション" : "Today's Pet Saving Mission"}
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "var(--text-primary)" }}>
+                      {savedToday
+                        ? language === "ja"
+                          ? `${target.avatar_name}は今日の貯金でうれしそうです。`
+                          : `${target.avatar_name} is happy with today's savings.`
+                        : language === "ja"
+                          ? `¥${petSavingAmount.toLocaleString()}を貯金して${target.avatar_name}を応援しましょう。`
+                          : `Save ¥${petSavingAmount.toLocaleString()} to cheer up ${target.avatar_name}.`}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 30 }}>{savedToday ? "🎉" : "🐾"}</div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handlePetSavingMission}
+                  disabled={savedToday || target.status === "completed"}
+                  style={{ width: "100%", justifyContent: "center" }}
+                >
+                  <PiggyBank size={18} />
+                  {savedToday
+                    ? language === "ja" ? "今日のミッション完了" : "Mission complete today"
+                    : language === "ja" ? `¥${petSavingAmount.toLocaleString()} 貯金する` : `Save ¥${petSavingAmount.toLocaleString()}`}
+                </button>
               </div>
             </motion.div>
           ) : (
