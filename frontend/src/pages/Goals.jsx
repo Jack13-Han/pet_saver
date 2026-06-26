@@ -28,7 +28,7 @@ export default function Goals() {
   const loadGoals = async () => {
     try {
       const [goalRes, shopRes] = await Promise.all([
-        targetApi.list('active'),
+        targetApi.list('all'),
         shopApi.list()
       ])
       setGoals(goalRes.data || [])
@@ -101,6 +101,9 @@ export default function Goals() {
 
   if (loading) return <div className="loading-screen"><div className="loading-paw">🐾</div></div>
 
+  const activeGoals = goals.filter(g => g.status === 'active')
+  const completedGoals = goals.filter(g => g.status === 'completed')
+
   return (
     <div className="animate-fade-in">
       <div className="page-header">
@@ -108,7 +111,7 @@ export default function Goals() {
           <h2>My Goals 🎯</h2>
           <p>Set targets and watch your pet grow!</p>
         </div>
-        {goals.length === 0 ? (
+        {activeGoals.length === 0 ? (
           <button className="btn btn-primary" onClick={() => setShowModal(true)}>
             <Plus size={18} /> New Goal
           </button>
@@ -119,9 +122,10 @@ export default function Goals() {
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
+      {/* ACTIVE GOALS SECTION */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20, marginBottom: completedGoals.length > 0 ? 40 : 0 }}>
         <AnimatePresence>
-          {goals.map(goal => (
+          {activeGoals.map(goal => (
             <motion.div key={goal.id} className="card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }} layout>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -163,11 +167,56 @@ export default function Goals() {
         </AnimatePresence>
       </div>
 
-      {goals.length === 0 && (
-        <div className="card" style={{ textAlign: 'center', padding: 48 }}>
+      {activeGoals.length === 0 && (
+        <div className="card" style={{ textAlign: 'center', padding: 48, marginBottom: completedGoals.length > 0 ? 40 : 0 }}>
           <Target size={48} style={{ color: 'var(--text-muted)', marginBottom: 16 }} />
-          <h3>No goals yet</h3>
-          <p style={{ color: 'var(--text-secondary)', marginTop: 8 }}>Create your first savings goal to get started!</p>
+          <h3>No active goals</h3>
+          <p style={{ color: 'var(--text-secondary)', marginTop: 8 }}>Create a savings goal to start your pet companion!</p>
+        </div>
+      )}
+
+      {/* COMPLETED GOALS HISTORY SECTION */}
+      {completedGoals.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <h3 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+            🏆 Completed Goals History
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
+            <AnimatePresence>
+              {completedGoals.map(goal => (
+                <motion.div key={goal.id} className="card" style={{ border: '1px solid #10b981', background: 'var(--bg-card)', opacity: 0.95 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }} layout>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ fontSize: 40 }}>{avatarTypes.find(a => a.id === goal.avatar_type)?.emoji || '🐕'}</div>
+                      <div>
+                        <h3 style={{ fontWeight: 700, fontSize: 18, color: 'var(--text-primary)' }}>{goal.name}</h3>
+                        <p style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 600 }}>{goal.avatar_name} • {goal.category}</p>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }} onClick={() => setDeleteTarget(goal)} aria-label={`Delete ${goal.name}`}>
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="goal-progress-section">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontWeight: 700, color: '#10b981' }}>¥{parseInt(goal.target_amount).toLocaleString()}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>Target Met!</span>
+                    </div>
+                    <div className="goal-progress-bar" style={{ background: '#dcfce7' }}>
+                      <div className="goal-progress-fill" style={{ width: '100%', background: '#10b981' }} />
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 12, padding: 10, background: '#dcfce7', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#047857' }}>
+                      🎉 Goal Successfully Reached!
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
         </div>
       )}
 

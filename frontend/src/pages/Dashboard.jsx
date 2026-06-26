@@ -14,6 +14,9 @@ import {
   Calendar,
   AlertTriangle,
   Trash2,
+  Trophy,
+  Award,
+  PiggyBank,
 } from "lucide-react";
 import {
   dashboard as dashboardApi,
@@ -178,13 +181,13 @@ export default function Dashboard() {
   };
 
   const handleTransaction = async (type, transactionAmount = "") => {
-    if (!transactionAmount || !data?.activeTarget) return false;
+    if (!transactionAmount) return false;
     const numAmount = parseFloat(transactionAmount);
     if (numAmount <= 0) return false;
 
     try {
       const res = await txApi.create({
-        target_id: data.activeTarget.id,
+        target_id: type === "deposit" && data?.activeTarget ? data.activeTarget.id : null,
         amount: numAmount,
         type,
         category: transactionCategory,
@@ -203,27 +206,26 @@ export default function Dashboard() {
           : `Deducted ¥${numAmount.toLocaleString()}`,
       );
 
-      setData((prev) => ({
-        ...prev,
-        activeTarget: {
-          ...prev.activeTarget,
-          current_amount: res.data.new_amount,
-          progress: res.data.progress,
-          status: res.data.status,
-          mood: res.data.mood,
-          happiness:
-            type === "deposit"
-              ? Math.min(100, prev.activeTarget.happiness + 5)
-              : Math.max(0, prev.activeTarget.happiness - 5),
-        },
-      }));
+      if (type === "deposit" && data?.activeTarget) {
+        setData((prev) => ({
+          ...prev,
+          activeTarget: {
+            ...prev.activeTarget,
+            current_amount: res.data.new_amount,
+            progress: res.data.progress,
+            status: res.data.status,
+            mood: res.data.mood,
+            happiness: Math.min(100, prev.activeTarget.happiness + 5),
+          },
+        }));
 
-      if (res.data.status === "completed") {
-        showToast("🎉 Goal completed! You earned coins!");
-        const currentCoins = user?.coins || parseInt(JSON.parse(localStorage.getItem('user'))?.coins) || 0;
-        updateUser({
-          coins: currentCoins + Math.floor(data.activeTarget.target_amount / 100),
-        });
+        if (res.data.status === "completed") {
+          showToast("🎉 Goal completed! You earned coins!");
+          const currentCoins = user?.coins || parseInt(JSON.parse(localStorage.getItem('user'))?.coins) || 0;
+          updateUser({
+            coins: currentCoins + Math.floor(data.activeTarget.target_amount / 100),
+          });
+        }
       }
 
       loadDashboard();
@@ -971,50 +973,175 @@ export default function Dashboard() {
             </motion.div>
           )}
 
-          {/* CARE ACTIONS */}
-          {target && (
+          {/* STATS CARDS */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+              gap: 16,
+              marginBottom: 20,
+            }}
+          >
+            {/* Total Saved Card */}
             <motion.div
               className="card"
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3 }}
+              transition={{ delay: 0.1 }}
+              whileHover={{ y: -4, boxShadow: "0 12px 24px rgba(0, 0, 0, 0.05)" }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                padding: 16,
+                borderLeft: "4px solid var(--accent-green)",
+                borderRadius: 16,
+              }}
             >
-              <div className="card-header">
-                <h3 className="card-title">
-                  Take Care of {target.avatar_name}
-                </h3>
-              </div>
-              <div className="care-grid">
-                {careActions.map((action) => (
-                  <motion.button
-                    key={action.id}
-                    className="care-btn"
-                    whileHover={careLimitReached ? undefined : { scale: 1.05 }}
-                    whileTap={careLimitReached ? undefined : { scale: 0.95 }}
-                    onClick={() => handleCare(action)}
-                    disabled={careLimitReached}
-                  >
-                    <span className="care-btn-icon">{action.icon}</span>
-                    <span className="care-btn-title">{action.title}</span>
-                    <span className="care-btn-effect">{action.effect}</span>
-                  </motion.button>
-                ))}
-              </div>
-              <p
+              <div
                 style={{
-                  textAlign: "center",
-                  marginTop: 16,
-                  color: "var(--text-muted)",
-                  fontSize: 13,
-                  fontWeight: 600,
+                  width: 48,
+                  height: 48,
+                  borderRadius: 12,
+                  background: "var(--accent-green-light)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--accent-green)",
                 }}
               >
-                {careLimitReached
-                  ? "Daily care limit reached. Come back tomorrow!"
-                  : `${careActionsRemaining} of 3 care actions remaining today.`}
-              </p>
+                <PiggyBank size={24} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 700 }}>
+                  Total Saved
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text-main)", marginTop: 4 }}>
+                  ¥{(data?.user?.total_saved || 0).toLocaleString()}
+                </div>
+              </div>
             </motion.div>
-          )}
+
+            {/* Savings Streak Card */}
+            <motion.div
+              className="card"
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.15 }}
+              whileHover={{ y: -4, boxShadow: "0 12px 24px rgba(0, 0, 0, 0.05)" }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                padding: 16,
+                borderLeft: "4px solid var(--accent-yellow)",
+                borderRadius: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 12,
+                  background: "var(--accent-yellow-light)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--accent-yellow)",
+                }}
+              >
+                <Flame size={24} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 700 }}>
+                  Savings Streak
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text-main)", marginTop: 4 }}>
+                  {data?.user?.streak_days || 0} Days
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Completed Goals Card */}
+            <motion.div
+              className="card"
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              whileHover={{ y: -4, boxShadow: "0 12px 24px rgba(0, 0, 0, 0.05)" }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                padding: 16,
+                borderLeft: "4px solid var(--accent-blue)",
+                borderRadius: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 12,
+                  background: "var(--accent-blue-light)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--accent-blue)",
+                }}
+              >
+                <Trophy size={24} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 700 }}>
+                  Completed Goals
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text-main)", marginTop: 4 }}>
+                  {data?.user?.total_targets_completed || 0}
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Saver Rank Card */}
+            <motion.div
+              className="card"
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.25 }}
+              whileHover={{ y: -4, boxShadow: "0 12px 24px rgba(0, 0, 0, 0.05)" }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                padding: 16,
+                borderLeft: "4px solid #A28DFF",
+                borderRadius: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 12,
+                  background: "#E8E5FF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#7C3AED",
+                }}
+              >
+                <Award size={24} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, color: "var(--text-muted)", fontWeight: 700 }}>
+                  Saver Rank
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: "var(--text-main)", marginTop: 4 }}>
+                  {data?.user?.rank || "Bronze"}
+                </div>
+              </div>
+            </motion.div>
+          </div>
 
           {/* ACHIEVEMENTS */}
           <motion.div
@@ -1124,79 +1251,7 @@ export default function Dashboard() {
             </motion.div>
           )}
 
-          {/* PET STATUS */}
-          {target && (
-            <motion.div
-              className="card"
-              initial={{ x: 20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.3 }}
-            >
-              <h3 className="card-title" style={{ marginBottom: 16 }}>
-                Pet Status
-              </h3>
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 12 }}
-              >
-                {["happiness", "energy", "fullness"].map((stat) => (
-                  <div
-                    key={stat}
-                    style={{ display: "flex", alignItems: "center", gap: 12 }}
-                  >
-                    <span style={{ fontSize: 20 }}>
-                      {stat === "happiness"
-                        ? "😊"
-                        : stat === "energy"
-                          ? "⚡"
-                          : "🥣"}
-                    </span>
-                    <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          marginBottom: 4,
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontWeight: 700,
-                            fontSize: 14,
-                            textTransform: "capitalize",
-                          }}
-                        >
-                          {stat}
-                        </span>
-                        <span
-                          style={{
-                            fontWeight: 700,
-                            fontSize: 14,
-                            color: "var(--text-secondary)",
-                          }}
-                        >
-                          {target[stat]} / 100
-                        </span>
-                      </div>
-                      <div className="goal-progress-bar" style={{ height: 8 }}>
-                        <div
-                          className="goal-progress-fill"
-                          style={{
-                            width: `${target[stat]}%`,
-                            background:
-                              stat === "happiness"
-                                ? "var(--accent-green)"
-                                : stat === "energy"
-                                  ? "var(--accent-yellow)"
-                                  : "var(--accent-blue)",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
+
 
           {/* TIP */}
           <motion.div

@@ -62,6 +62,7 @@ define('DB_NAME', $_ENV['DB_NAME'] ?? 'pet_saver');
 define('DB_USER', $_ENV['DB_USER'] ?? 'root');
 define('DB_PASS', $_ENV['DB_PASS'] ?? '');
 define('JWT_SECRET', $_ENV['JWT_SECRET'] ?? 'change_me_in_production');
+define('GEMINI_API_KEY', $_ENV['GEMINI_API_KEY'] ?? 'AQ.Ab8RN6KNo_XxmKs9xAoeRLUNQaftgt2WnL-gjuGvR8qXrIf27Q');
 
 try {
     $dsn = "mysql:host=" . DB_HOST .

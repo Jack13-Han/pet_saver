@@ -341,26 +341,43 @@ if ($path === 'dashboard' && $method === 'GET') {
         a.mood, a.accessories
     FROM targets t
     LEFT JOIN avatars a ON t.id = a.target_id
-    WHERE t.user_id = ?
+    WHERE t.user_id = ? AND t.status = 'active'
     ORDER BY t.created_at DESC LIMIT 1
     ");
     $stmt->execute([$userId]);
     $activeTarget = $stmt->fetch();
 
     if ($activeTarget) {
+        // Self-healing: associate orphaned transactions with the active target
+        $stmt = $pdo->prepare("SELECT id FROM targets WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $validTargetIds = array_column($stmt->fetchAll(), 'id');
+        if (!empty($validTargetIds)) {
+            $inClause = implode(',', array_fill(0, count($validTargetIds), '?'));
+            $params = array_merge([$activeTarget['id'], $userId], $validTargetIds);
+            $pdo->prepare("UPDATE transactions SET target_id = ? WHERE user_id = ? AND target_id IS NOT NULL AND target_id NOT IN ($inClause)")
+                ->execute($params);
+        }
+
         $stmt = $pdo->prepare("
             SELECT
                 COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) -
                 COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0) AS net_savings
             FROM transactions
-            WHERE user_id = ?
+            WHERE target_id = ? AND user_id = ?
         ");
-        $stmt->execute([$userId]);
+        $stmt->execute([$activeTarget['id'], $userId]);
         $netSavings = max(0, (float)$stmt->fetchColumn());
 
-        $activeTarget['current_amount'] = $netSavings;
-        $activeTarget['progress'] = $activeTarget['target_amount'] > 0 ? round(($netSavings / $activeTarget['target_amount']) * 100, 1) : 0;
-        $activeTarget['status'] = $activeTarget['progress'] >= 100 ? 'completed' : 'active';
+        if ((float)$activeTarget['current_amount'] !== $netSavings) {
+            $progress = $activeTarget['target_amount'] > 0 ? ($netSavings / $activeTarget['target_amount']) * 100 : 0;
+            $newStatus = $progress >= 100 ? 'completed' : 'active';
+            $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$netSavings, $newStatus, $activeTarget['id']]);
+            $activeTarget['current_amount'] = $netSavings;
+            $activeTarget['status'] = $newStatus;
+        }
+
+        $activeTarget['progress'] = $activeTarget['target_amount'] > 0 ? round(($activeTarget['current_amount'] / $activeTarget['target_amount']) * 100, 1) : 0;
         $activeTarget['accessories'] = json_decode($activeTarget['accessories'] ?? '[]', true);
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE user_id = ? AND activity_type = 'care' AND activity_date = CURDATE()");
         $stmt->execute([$userId]);
@@ -398,6 +415,24 @@ if ($path === 'targets' && $method === 'GET') {
     }
     $targets = $stmt->fetchAll();
     foreach ($targets as &$t) {
+        $calcStmt = $pdo->prepare("
+            SELECT
+                COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) -
+                COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0)
+            FROM transactions
+            WHERE target_id = ? AND user_id = ?
+        ");
+        $calcStmt->execute([$t['id'], $userId]);
+        $correctAmount = max(0, (float)$calcStmt->fetchColumn());
+
+        if ((float)$t['current_amount'] !== $correctAmount) {
+            $progress = $t['target_amount'] > 0 ? ($correctAmount / $t['target_amount']) * 100 : 0;
+            $newStatus = $progress >= 100 ? 'completed' : 'active';
+            $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$correctAmount, $newStatus, $t['id']]);
+            $t['current_amount'] = $correctAmount;
+            $t['status'] = $newStatus;
+        }
+
         $t['progress'] = $t['target_amount'] > 0 ? round(($t['current_amount'] / $t['target_amount']) * 100, 1) : 0;
         $t['days_left'] = $t['deadline'] ? max(0, (strtotime($t['deadline']) - time()) / 86400) : null;
     }
@@ -594,19 +629,22 @@ if (preg_match('/^targets\/(\d+)$/', $path, $m) && $method === 'PUT') {
 }
 
 if ($path === 'transactions' && $method === 'POST') {
-    $targetId = intval($input['target_id'] ?? 0);
+    $targetId = isset($input['target_id']) && $input['target_id'] !== null ? intval($input['target_id']) : 0;
     $amountInput = $input['amount'] ?? null;
     $amount = is_numeric($amountInput) ? round((float)$amountInput, 2) : 0;
     $type = $input['type'] ?? '';
-    if ($targetId <= 0 || $amount <= 0 || !in_array($type, ['deposit', 'withdrawal'])) errorResponse('Invalid data');
+    if ($amount <= 0 || !in_array($type, ['deposit', 'withdrawal'])) errorResponse('Invalid data');
     if (!is_finite($amount) || $amount > MAX_MONEY_AMOUNT) {
         errorResponse('Amount is too large. Please enter a value up to 9,999,999,999,999.99');
     }
 
-    $stmt = $pdo->prepare("SELECT * FROM targets WHERE id = ? AND user_id = ?");
-    $stmt->execute([$targetId, $userId]);
-    $target = $stmt->fetch();
-    if (!$target) errorResponse('Target not found');
+    $target = null;
+    if ($targetId > 0) {
+        $stmt = $pdo->prepare("SELECT * FROM targets WHERE id = ? AND user_id = ?");
+        $stmt->execute([$targetId, $userId]);
+        $target = $stmt->fetch();
+        if (!$target) errorResponse('Target not found');
+    }
 
     // Extract category if explicitly passed, else try to parse from note, or fallback to General
     $category = trim($input['category'] ?? '');
@@ -620,56 +658,75 @@ if ($path === 'transactions' && $method === 'POST') {
         $category = 'General';
     }
 
-    $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, category, note, transaction_date) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        ->execute([$targetId, $userId, $amount, $type, $category, $input['note'] ?? '', $input['date'] ?? date('Y-m-d')]);
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, category, note, transaction_date) VALUES (?, ?, ?, ?, ?, ?, ?)")
+            ->execute([$targetId ?: null, $userId, $amount, $type, $category, $input['note'] ?? '', $input['date'] ?? date('Y-m-d')]);
 
-    if ($type === 'deposit') {
-        $newAmount = $target['current_amount'] + $amount;
-        $pdo->prepare("UPDATE users SET total_saved = total_saved + ? WHERE id = ?")->execute([$amount, $userId]);
-    } else {
-        $newAmount = max(0, $target['current_amount'] - $amount);
+        if ($target) {
+            if ($type === 'deposit') {
+                $newAmount = $target['current_amount'] + $amount;
+                $pdo->prepare("UPDATE users SET total_saved = total_saved + ? WHERE id = ?")->execute([$amount, $userId]);
+            } else {
+                $newAmount = max(0, $target['current_amount'] - $amount);
+            }
+
+            $stmt = $pdo->prepare("
+                SELECT
+                    COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) -
+                    COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0)
+                FROM transactions
+                WHERE target_id = ? AND user_id = ?
+            ");
+            $stmt->execute([$targetId, $userId]);
+            $newAmount = max(0, (float)$stmt->fetchColumn());
+
+            $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
+            $displayProgress = min(100, $progress);
+            $status = $progress >= 100 ? 'completed' : 'active';
+
+            if ($status === 'completed') {
+                $pdo->prepare("UPDATE targets SET current_amount = ?, status = ?, completion_date = COALESCE(completion_date, NOW()) WHERE id = ?")->execute([$newAmount, $status, $targetId]);
+                $pdo->prepare("UPDATE users SET active_target_id = NULL WHERE id = ? AND active_target_id = ?")->execute([$userId, $targetId]);
+            } else {
+                $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$newAmount, $status, $targetId]);
+            }
+
+            $mood = 'neutral';
+            if ($progress >= 100) $mood = 'celebrating';
+            elseif ($progress >= 70) $mood = 'happy';
+            elseif ($progress >= 40) $mood = 'neutral';
+            elseif ($progress > 0) $mood = 'sad';
+            else $mood = 'dirty';
+
+            $happiness = min(100, max(0, 50 + ($progress - 50)));
+            $pdo->prepare("UPDATE avatars SET mood = ?, happiness = ? WHERE target_id = ?")->execute([$mood, $happiness, $targetId]);
+
+            if ($progress >= 100 && $target['status'] !== 'completed') {
+                $coinsEarned = floor($target['target_amount'] / 100);
+                $pdo->prepare("UPDATE users SET coins = coins + ?, total_targets_completed = total_targets_completed + 1 WHERE id = ?")->execute([$coinsEarned, $userId]);
+                updateRank($pdo, $userId);
+            }
+        } else {
+            if ($type === 'deposit') {
+                $pdo->prepare("UPDATE users SET total_saved = total_saved + ? WHERE id = ?")->execute([$amount, $userId]);
+            }
+            $newAmount = 0;
+            $displayProgress = 0;
+            $progress = 0;
+            $status = 'active';
+            $mood = 'neutral';
+        }
+
+        checkAchievements($pdo, $userId);
+        $pdo->commit();
+        successResponse(['new_amount' => $newAmount, 'progress' => round($displayProgress, 1), 'actual_progress' => round($progress, 1), 'status' => $status, 'mood' => $mood], 'Transaction recorded');
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        errorResponse('Failed to record transaction: ' . $e->getMessage(), 500);
     }
-
-    $stmt = $pdo->prepare("
-        SELECT
-            COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) -
-            COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0)
-        FROM transactions
-        WHERE user_id = ?
-    ");
-    $stmt->execute([$userId]);
-    $newAmount = max(0, (float)$stmt->fetchColumn());
-
-    $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
-    $displayProgress = min(100, $progress);
-    $status = $progress >= 100 ? 'completed' : 'active';
-
-    if ($status === 'completed') {
-        $pdo->prepare("UPDATE targets SET current_amount = ?, status = ?, completion_date = COALESCE(completion_date, NOW()) WHERE id = ?")->execute([$newAmount, $status, $targetId]);
-        $pdo->prepare("UPDATE users SET active_target_id = NULL WHERE id = ? AND active_target_id = ?")->execute([$userId, $targetId]);
-    } else {
-        $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$newAmount, $status, $targetId]);
-    }
-
-    $mood = 'neutral';
-    if ($progress >= 100) $mood = 'celebrating';
-    elseif ($progress >= 70) $mood = 'happy';
-    elseif ($progress >= 40) $mood = 'neutral';
-    elseif ($progress > 0) $mood = 'sad';
-    else $mood = 'dirty';
-
-    $happiness = min(100, max(0, 50 + ($progress - 50)));
-    $pdo->prepare("UPDATE avatars SET mood = ?, happiness = ? WHERE target_id = ?")->execute([$mood, $happiness, $targetId]);
-
-    if ($progress >= 100 && $target['status'] !== 'completed') {
-        $coinsEarned = floor($target['target_amount'] / 100);
-        $pdo->prepare("UPDATE users SET coins = coins + ?, total_targets_completed = total_targets_completed + 1 WHERE id = ?")->execute([$coinsEarned, $userId]);
-        updateRank($pdo, $userId);
-    }
-
-    checkAchievements($pdo, $userId);
-    $pdo->commit();
-    successResponse(['new_amount' => $newAmount, 'progress' => round($displayProgress, 1), 'actual_progress' => round($progress, 1), 'status' => $status, 'mood' => $mood], 'Transaction recorded');
 }
 
 if ($path === 'transactions' && $method === 'GET') {
@@ -1047,9 +1104,12 @@ function scanReceiptWithGemini($image, $mimeType)
     if ($apiKey === '') {
         $apiKey = getenv('VITE_GEMINI_API_KEY') ?: ($_ENV['VITE_GEMINI_API_KEY'] ?? '');
     }
+    if ($apiKey === '' && defined('GEMINI_API_KEY')) {
+        $apiKey = GEMINI_API_KEY;
+    }
 
     if ($apiKey === '') {
-        errorResponse('Gemini API key is missing in api/.env', 500);
+        errorResponse('Gemini API key is missing in api/.env or config.php', 500);
     }
 
     if (!preg_match('/^image\/(jpeg|jpg|png|webp|heic|heif)$/i', $mimeType)) {
@@ -1124,6 +1184,8 @@ function postJson($url, $payload)
             CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
             CURLOPT_POSTFIELDS => $json,
             CURLOPT_TIMEOUT => 45,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
         ]);
         $body = curl_exec($ch);
         $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -1144,6 +1206,10 @@ function postJson($url, $payload)
             'content' => $json,
             'timeout' => 45,
             'ignore_errors' => true,
+        ],
+        'ssl' => [
+            'verify_peer' => false,
+            'verify_peer_name' => false,
         ]
     ]);
 
@@ -1410,9 +1476,9 @@ function syncTargetFromTransactions($pdo, $userId, $targetId)
             COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) -
             COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0)
         FROM transactions
-        WHERE user_id = ?
+        WHERE target_id = ? AND user_id = ?
     ");
-    $stmt->execute([$userId]);
+    $stmt->execute([$targetId, $userId]);
     $newAmount = max(0, (float)$stmt->fetchColumn());
 
     $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
