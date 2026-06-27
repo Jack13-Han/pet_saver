@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   AlertTriangle,
   ArrowRight,
@@ -8,6 +8,8 @@ import {
   PieChart as PieIcon,
   TrendingDown,
   TrendingUp,
+  Sparkles,
+  X,
 } from 'lucide-react'
 import {
   Bar,
@@ -21,7 +23,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { transactions as txApi } from '../api.js'
+import { transactions as txApi, finance } from '../api.js'
 
 const emptyInsights = {
   categories: [],
@@ -46,6 +48,65 @@ export default function Insights() {
   const [data, setData] = useState(emptyInsights)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [showWeeklyModal, setShowWeeklyModal] = useState(false)
+  const [weeklyReportText, setWeeklyReportText] = useState('')
+  const [loadingReport, setLoadingReport] = useState(false)
+
+  const fetchWeeklyReport = async () => {
+    setShowWeeklyModal(true)
+    setLoadingReport(true)
+    try {
+      const res = await finance.weeklyReport()
+      setWeeklyReportText(res.data?.report || 'Failed to generate weekly report.')
+    } catch (err) {
+      console.error(err)
+      setWeeklyReportText('Error generating weekly AI report: ' + err.message)
+    } finally {
+      setLoadingReport(false)
+    }
+  }
+
+  const renderMarkdown = (text) => {
+    if (!text) return null;
+    return text.split("\n").map((line, index) => {
+      let cleanLine = line.trim();
+      if (!cleanLine) return <div key={index} style={{ height: 8 }} />;
+      
+      // Headers
+      if (cleanLine.startsWith("###")) {
+        return <h4 key={index} style={{ fontSize: 15, fontWeight: 800, color: "var(--text-main)", marginTop: 12, marginBottom: 6 }}>{cleanLine.replace("###", "").trim()}</h4>;
+      }
+      if (cleanLine.startsWith("##")) {
+        return <h3 key={index} style={{ fontSize: 17, fontWeight: 800, color: "var(--text-main)", marginTop: 16, marginBottom: 8 }}>{cleanLine.replace("##", "").trim()}</h3>;
+      }
+      
+      // Bullet points
+      if (cleanLine.startsWith("-") || cleanLine.startsWith("*")) {
+        const content = cleanLine.substring(1).trim();
+        return (
+          <li key={index} style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text-secondary)", marginLeft: 16, listStyleType: "disc", marginBottom: 4 }}>
+            {parseBold(content)}
+          </li>
+        );
+      }
+      
+      return (
+        <p key={index} style={{ fontSize: 14, lineHeight: 1.6, color: "var(--text-secondary)", marginBottom: 8 }}>
+          {parseBold(cleanLine)}
+        </p>
+      );
+    });
+  }
+
+  const parseBold = (text) => {
+    const parts = text.split(/\*\*([^*]+)\*\*/g);
+    return parts.map((part, i) => {
+      if (i % 2 === 1) {
+        return <strong key={i} style={{ fontWeight: 800, color: "var(--text-main)" }}>{part}</strong>;
+      }
+      return part;
+    });
+  }
 
   useEffect(() => {
     loadInsights()
@@ -338,6 +399,41 @@ export default function Insights() {
 
             <h4 style={{ color: '#92400E', fontSize: 16, fontWeight: 800, marginBottom: 8 }}>{advice.title}</h4>
             <p style={{ color: '#78350F', fontSize: 14, lineHeight: 1.6, fontWeight: 600 }}>{advice.desc}</p>
+
+            <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px dashed rgba(180, 83, 9, 0.2)' }}>
+              <h4 style={{ color: '#92400E', fontSize: 15, fontWeight: 800, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={16} color="#8B5CF6" />
+                Weekly AI Finance Report
+              </h4>
+              <p style={{ color: '#78350F', fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
+                ရက်သတ္တပတ်အတွင်း သင့်ရဲ့ စုဆောင်းမှုနဲ့ သုံးစွဲမှုများကို AI မှ အသေးစိတ် တွက်ချက်သုံးသပ်ပေးပါမည်။
+              </p>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={fetchWeeklyReport}
+                type="button"
+                style={{
+                  background: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '10px 16px',
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.25)',
+                  width: '100%',
+                  justifyContent: 'center',
+                }}
+              >
+                <Sparkles size={16} />
+                AI အစီရင်ခံစာ ထုတ်ယူမည်
+              </motion.button>
+            </div>
           </div>
 
           <button
@@ -363,6 +459,166 @@ export default function Insights() {
           </button>
         </motion.div>
       </div>
+
+      <AnimatePresence>
+        {showWeeklyModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.4)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: 20,
+            }}
+            onClick={() => setShowWeeklyModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              transition={{ type: 'spring', duration: 0.5 }}
+              style={{
+                background: 'var(--bg-card)',
+                borderRadius: 24,
+                width: '100%',
+                maxWidth: 550,
+                maxHeight: '85vh',
+                overflow: 'hidden',
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                border: '1px solid var(--border-color)',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div
+                style={{
+                  padding: '20px 24px',
+                  borderBottom: '1px solid var(--border-color)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div
+                    style={{
+                      background: 'var(--accent-purple-light)',
+                      color: 'var(--accent-purple)',
+                      width: 40,
+                      height: 40,
+                      borderRadius: 12,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Sparkles size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                      Weekly AI Report
+                    </h3>
+                    <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>
+                      ရက်သတ္တပတ် ဘဏ္ဍာရေး သုံးသပ်ချက်
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowWeeklyModal(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-secondary)',
+                    padding: 4,
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div
+                style={{
+                  padding: 24,
+                  overflowY: 'auto',
+                  flex: 1,
+                  minHeight: 200,
+                }}
+              >
+                {loadingReport ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: 250,
+                      gap: 16,
+                    }}
+                  >
+                    <motion.div
+                      animate={{
+                        scale: [1, 1.2, 1],
+                        rotate: [0, 360],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: 'easeInOut',
+                      }}
+                      style={{
+                        color: 'var(--accent-purple)',
+                      }}
+                    >
+                      <Sparkles size={48} />
+                    </motion.div>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                      ဘဏ္ဍာရေး အချက်အလက်များကို AI ဖြင့် သုံးသပ်နေပါသည်...
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ wordBreak: 'break-word' }}>
+                    {renderMarkdown(weeklyReportText)}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div
+                style={{
+                  padding: '16px 24px',
+                  borderTop: '1px solid var(--border-color)',
+                  display: 'flex',
+                  justifyContent: 'flex-end',
+                  background: 'var(--bg-primary)',
+                }}
+              >
+                <button
+                  className="btn btn-secondary"
+                  style={{ borderRadius: 12 }}
+                  onClick={() => setShowWeeklyModal(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

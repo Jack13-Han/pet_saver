@@ -473,18 +473,28 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="pet-scene">
+              <div className="pet-scene" style={{ cursor: "pointer" }}>
                 <motion.img
                   src={getPetImage()}
                   alt="Pet"
                   className="pet-character-img"
+                  whileHover={{ y: -15, scale: 1.08 }}
+                  whileTap={{ scale: 0.95 }}
                   animate={{
                     scale: [1, 1.03, 1],
                   }}
                   transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "easeInOut",
+                    y: { type: "spring", stiffness: 300, damping: 12 },
+                    scale: {
+                      type: "spring",
+                      stiffness: 300,
+                      damping: 12,
+                    },
+                    default: {
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }
                   }}
                 />
               </div>

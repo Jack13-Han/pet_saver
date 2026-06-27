@@ -149,6 +149,7 @@ export const recurring = {
 
 export const finance = {
   overview: () => api("finance/overview"),
+  weeklyReport: () => api("finance/weekly-report"),
   claimMission: (missionId) =>
     api("missions/claim", { method: "POST", body: { mission_id: missionId } }),
 };
