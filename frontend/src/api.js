@@ -105,10 +105,6 @@ export const calendar = {
   get: () => api("calendar"),
 };
 
-export const avatars = {
-  care: (data) => api("avatars/care", { method: "POST", body: data }),
-};
-
 export const shop = {
   list: (category) => api(`shop${category ? `?category=${category}` : ""}`),
   buy: (accessoryId, targetId) =>
