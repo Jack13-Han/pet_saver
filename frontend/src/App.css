@@ -480,6 +480,11 @@ body {
   border: 2px solid #fed7aa;
 }
 
+.pet-card > * {
+  position: relative;
+  z-index: 1;
+}
+
 .pet-header {
   display: flex;
   justify-content: space-between;
@@ -538,9 +543,6 @@ body {
 .pet-mood.neutral {
   color: var(--text-secondary);
 }
-.pet-mood.dirty {
-  color: #8b5cf6;
-}
 .pet-mood.celebrating {
   color: var(--accent-orange);
 }
@@ -552,6 +554,22 @@ body {
   height: 220px;
   position: relative;
   margin: 16px 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.pet-scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at var(--spotlight-x, 50%) var(--spotlight-y, 45%),
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(255, 255, 255, 0.34) 32%,
+    rgba(251, 146, 60, 0.1) 66%,
+    transparent 100%
+  );
+  pointer-events: none;
 }
 
 .pet-character {
@@ -610,62 +628,79 @@ body {
   }
 }
 
-.pet-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-top: 16px;
-}
-
-.pet-stat {
+.pet-follow-eyes {
+  position: absolute;
+  top: 43%;
+  left: 50%;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 18px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0.88;
 }
 
-.pet-stat-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
+.pet-follow-eye {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  flex-shrink: 0;
 }
 
-.pet-stat-icon.happiness {
-  background: var(--accent-green-light);
-}
-.pet-stat-icon.energy {
-  background: var(--accent-yellow-light);
-}
-.pet-stat-icon.fullness {
-  background: var(--accent-blue-light);
+.pet-follow-eye span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #111827;
+  transform: translate(var(--pet-eye-x, 0), var(--pet-eye-y, 0));
+  transition: transform 0.08s ease-out;
 }
 
-.pet-stat-bar {
-  flex: 1;
-  height: 8px;
-  background: rgba(0, 0, 0, 0.08);
-  border-radius: var(--radius-full);
+.pet-progress-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(251, 146, 60, 0.24);
+  border-radius: var(--radius-lg);
+}
+
+.pet-progress-strip > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pet-progress-strip strong {
+  color: var(--text-main);
+  font-size: 18px;
+}
+
+.pet-progress-track {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
   overflow: hidden;
 }
 
-.pet-stat-fill {
+.pet-progress-fill {
   height: 100%;
-  border-radius: var(--radius-full);
-  transition: width 0.6s ease;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #22c55e, #2563eb);
+  transition: width 0.45s ease;
 }
 
-.pet-stat-fill.happiness {
-  background: var(--accent-green);
-}
-.pet-stat-fill.energy {
-  background: var(--accent-yellow);
-}
-.pet-stat-fill.fullness {
-  background: var(--accent-blue);
+.finance-calendar-card {
+  overflow: hidden;
 }
 
 .pet-stat-value {
@@ -787,60 +822,71 @@ body {
   margin-top: 16px;
 }
 
-.care-btn {
+.finance-calendar-weekdays,
+.finance-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.finance-calendar-weekdays {
+  margin-top: 16px;
+}
+
+.finance-calendar-weekdays span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.finance-calendar-grid {
+  margin-top: 8px;
+}
+
+.finance-calendar-day {
+  min-height: 88px;
+  padding: 9px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 16px 8px;
-  background: white;
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: var(--transition);
-  font-family: inherit;
+  gap: 4px;
 }
 
-.care-btn:hover {
-  border-color: var(--accent-green);
-  background: var(--accent-green-light);
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-md);
+.finance-calendar-day.empty {
+  border-color: transparent;
+  background: transparent;
 }
 
-.care-btn:active {
-  transform: scale(0.95);
+.finance-calendar-day.today {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
 
-.care-btn:disabled {
-  opacity: 0.48;
-  cursor: not-allowed;
-  background: #f8fafc;
-  border-color: var(--border-color);
-  box-shadow: none;
-  transform: none;
+.finance-calendar-date {
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
 }
 
-.care-btn:disabled:hover {
-  background: #f8fafc;
-  border-color: var(--border-color);
-  box-shadow: none;
-  transform: none;
+.finance-calendar-amount {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.care-btn-icon {
-  font-size: 28px;
+.finance-calendar-amount.income {
+  color: #059669;
 }
 
-.care-btn-title {
-  font-weight: 700;
-  font-size: 14px;
-}
-
-.care-btn-effect {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-weight: 600;
+.finance-calendar-amount.expense {
+  color: #dc2626;
 }
 
 /* GOAL CARD */
@@ -2362,16 +2408,10 @@ select.form-input {
   .dashboard-grid {
     gap: 16px;
   }
-  .care-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .shop-grid {
     grid-template-columns: repeat(2, 1fr);
   }
   .achievement-grid {
-    grid-template-columns: 1fr;
-  }
-  .pet-stats {
     grid-template-columns: 1fr;
   }
   .pet-card {
@@ -2382,6 +2422,17 @@ select.form-input {
   }
   .pet-character-img {
     width: 160px;
+  }
+  .finance-calendar-weekdays,
+  .finance-calendar-grid {
+    gap: 4px;
+  }
+  .finance-calendar-day {
+    min-height: 72px;
+    padding: 6px;
+  }
+  .finance-calendar-amount {
+    font-size: 10px;
   }
   .transaction-input {
     flex-direction: column;
@@ -2615,6 +2666,8 @@ select.form-input {
   width: 220px;
   height: auto;
   object-fit: contain;
+  position: relative;
+  z-index: 1;
 }
 
 @media (max-width: 900px) {

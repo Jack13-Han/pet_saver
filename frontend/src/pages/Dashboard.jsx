@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -21,7 +21,6 @@ import {
 import {
   dashboard as dashboardApi,
   transactions as txApi,
-  avatars as avatarApi,
   user as userApi,
   targets as targetApi,
   calendar as calendarApi,
@@ -29,23 +28,29 @@ import {
 import { useAuth } from "../context/AuthContext.jsx";
 import { useLanguage } from "../i18n.jsx";
 import { realOCR } from "./ReceiptScanner.jsx";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { avatarEmojis, avatarTypes, getPetImageForTarget } from "../petAssets.js";
 
 const moodEmojis = {
   happy: "😊",
   neutral: "😐",
   sad: "😢",
-  dirty: "😷",
   celebrating: "🥳",
 };
 
-const careActions = [
-  { id: "play", icon: "🎾", title: "Play", effect: "+10 Happiness" },
-  { id: "feed", icon: "🍖", title: "Feed", effect: "+10 Fullness" },
-  { id: "rest", icon: "🛏️", title: "Rest", effect: "+10 Energy" },
-  { id: "shower", icon: "🚿", title: "Shower", effect: "+5 Happiness" },
-];
+const getMoodFromProgress = (progress = 0) => {
+  if (progress >= 100) return "celebrating";
+  if (progress >= 70) return "happy";
+  if (progress >= 40) return "neutral";
+  return "sad";
+};
+
+const formatDateKey = (date) => {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+};
+
+const money = (amount = 0) => `¥${Number(amount || 0).toLocaleString()}`;
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -54,6 +59,7 @@ export default function Dashboard() {
   const [toast, setToast] = useState(null);
   const [petReaction, setPetReaction] = useState(null);
   const [animatingPet, setAnimatingPet] = useState(false);
+  const [petPointer, setPetPointer] = useState({ x: 0, y: 0 });
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveAmount, setSaveAmount] = useState("");
   const [transactionType, setTransactionType] = useState("deposit");
@@ -112,6 +118,7 @@ export default function Dashboard() {
   const petSavingAmount = targetRemaining > 0
     ? Math.max(100, Math.min(500, Math.ceil(targetRemaining / 10)))
     : 100;
+  const petMood = getMoodFromProgress(progress);
   const shopPreview = (data?.shopPreview || []).filter(item => !['glasses', 'scarf'].includes(item.category));
   const getShopPreviewIcon = (item) => {
     if (item.avatar_type) return avatarTypes.find(type => type.id === item.avatar_type)?.emoji || item.icon;
@@ -146,19 +153,63 @@ export default function Dashboard() {
     boxShadow: "0 28px 70px rgba(15, 23, 42, 0.18)",
   };
 
-  const getPetImage = () => {
-    return getPetImageForTarget(target);
+  const calendarMonthLabel = useMemo(
+    () => new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+    [],
+  );
+
+  const calendarCells = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const todayKey = formatDateKey(now);
+    const totalsByDay = new Map(
+      calendarData.map((item) => [
+        item.day,
+        {
+          income: Number(item.income || 0),
+          expense: Number(item.expense || 0),
+        },
+      ]),
+    );
+
+    const emptyCells = Array.from({ length: firstDay.getDay() }, (_, index) => ({
+      key: `empty-${index}`,
+      isEmpty: true,
+    }));
+
+    const dayCells = Array.from({ length: totalDays }, (_, index) => {
+      const dayNumber = index + 1;
+      const key = formatDateKey(new Date(year, month, dayNumber));
+      const totals = totalsByDay.get(key) || { income: 0, expense: 0 };
+
+      return {
+        key,
+        dayNumber,
+        income: totals.income,
+        expense: totals.expense,
+        isToday: key === todayKey,
+      };
+    });
+
+    return [...emptyCells, ...dayCells];
+  }, [calendarData]);
+
+  const handlePetPointerMove = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+    const y = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
+
+    setPetPointer({
+      x: Math.max(-1, Math.min(1, x)),
+      y: Math.max(-1, Math.min(1, y)),
+    });
   };
 
-  const getPetMoodClass = () => {
-    const progress = target?.progress || 0;
-
-    if (progress >= 100) return "pet-celebrate";
-    if (progress >= 80) return "pet-excited";
-    if (progress >= 50) return "pet-happy";
-    if (progress >= 20) return "pet-normal";
-
-    return "pet-sad";
+  const getPetImage = () => {
+    return getPetImageForTarget(target);
   };
 
   useEffect(() => {
@@ -175,9 +226,10 @@ export default function Dashboard() {
       setData(dashboardRes.data);
       
       if (calendarRes.data) {
-        const formattedData = calendarRes.data.map(item => ({
-          date: new Date(item.day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          amount: parseFloat(item.total)
+        const formattedData = calendarRes.data.map((item) => ({
+          day: item.day,
+          income: Number(item.income || 0),
+          expense: Number(item.expense || 0),
         }));
         setCalendarData(formattedData);
       }
@@ -222,7 +274,6 @@ export default function Dashboard() {
 
       setAnimatingPet(true);
       setTimeout(() => setAnimatingPet(false), 1000);
-
       showToast(
         type === "deposit"
           ? `Saved ¥${numAmount.toLocaleString()}! 🎉`
@@ -270,12 +321,12 @@ export default function Dashboard() {
         amount: petSavingAmount,
         type: "deposit",
         category: "Pet Saving",
-        note: `Pet Saving ﾂｷ Daily mission for ${data.activeTarget.avatar_name || data.activeTarget.name}`,
+        note: `Pet Saving • Daily mission for ${data.activeTarget.avatar_name || data.activeTarget.name}`,
         date: new Date().toISOString().split("T")[0],
       });
 
       showPetReaction(res.data?.pet_reaction);
-      showToast(`Pet mission complete! Saved ﾂ･${petSavingAmount.toLocaleString()} for ${data.activeTarget.avatar_name}.`);
+      showToast(`Pet mission complete! Saved ¥${petSavingAmount.toLocaleString()} for ${data.activeTarget.avatar_name}.`);
       loadDashboard();
     } catch (err) {
       showToast(err.message || "Pet saving mission failed", "error");
@@ -316,7 +367,6 @@ export default function Dashboard() {
       showToast(err.message || "Care action failed", "error");
     }
   };
-
   const deleteExpiredGoal = async () => {
     if (!target || deletingExpiredGoal) return;
     setDeletingExpiredGoal(true);
@@ -440,7 +490,7 @@ export default function Dashboard() {
       <div className="page-header">
         <div className="page-title">
           <h2>Hello, {user?.username || data?.user?.username || "Saver"}! 👋</h2>
-          <p>Take care of your pet and reach your goals!</p>
+          <p>Save toward your target and watch your pet react.</p>
         </div>
         <div className="header-actions">
           <div className="streak-badge">
@@ -483,6 +533,14 @@ export default function Dashboard() {
           {target ? (
             <motion.div
               className="pet-card"
+              style={{
+                "--spotlight-x": `${50 + petPointer.x * 28}%`,
+                "--spotlight-y": `${45 + petPointer.y * 24}%`,
+                "--pet-eye-x": `${petPointer.x * 4}px`,
+                "--pet-eye-y": `${petPointer.y * 3}px`,
+              }}
+              onPointerMove={handlePetPointerMove}
+              onPointerLeave={() => setPetPointer({ x: 0, y: 0 })}
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.5 }}
@@ -520,10 +578,10 @@ export default function Dashboard() {
                             : "🎉 Goal completed!"}
                   </div>
                 </div>
-                <div className={`pet-mood ${target.mood}`}>
-                  <span>{moodEmojis[target.mood] || "😐"}</span>
+                <div className={`pet-mood ${petMood}`}>
+                  <span>{moodEmojis[petMood] || "😐"}</span>
                   <span>
-                    {target.mood.charAt(0).toUpperCase() + target.mood.slice(1)}
+                    {petMood.charAt(0).toUpperCase() + petMood.slice(1)}
                   </span>
                 </div>
               </div>
@@ -533,6 +591,11 @@ export default function Dashboard() {
                   src={getPetImage()}
                   alt="Pet"
                   className="pet-character-img"
+                  style={{
+                    x: petPointer.x * 6,
+                    y: petPointer.y * 4,
+                    rotate: petPointer.x * 1.5,
+                  }}
                   whileHover={{ y: -15, scale: 1.08 }}
                   whileTap={{ scale: 0.95 }}
                   animate={{
@@ -552,38 +615,26 @@ export default function Dashboard() {
                     }
                   }}
                 />
+                <div className="pet-follow-eyes" aria-hidden="true">
+                  <span className="pet-follow-eye">
+                    <span />
+                  </span>
+                  <span className="pet-follow-eye">
+                    <span />
+                  </span>
+                </div>
               </div>
 
-              <div className="pet-stats">
-                <div className="pet-stat">
-                  <div className="pet-stat-icon happiness">😊</div>
-                  <div className="pet-stat-bar">
-                    <div
-                      className="pet-stat-fill happiness"
-                      style={{ width: `${target.happiness}%` }}
-                    />
-                  </div>
-                  <span className="pet-stat-value">{target.happiness}/100</span>
+              <div className="pet-progress-strip">
+                <div>
+                  <span>Target progress</span>
+                  <strong>{Math.round(progress)}%</strong>
                 </div>
-                <div className="pet-stat">
-                  <div className="pet-stat-icon energy">⚡</div>
-                  <div className="pet-stat-bar">
-                    <div
-                      className="pet-stat-fill energy"
-                      style={{ width: `${target.energy}%` }}
-                    />
-                  </div>
-                  <span className="pet-stat-value">{target.energy}/100</span>
-                </div>
-                <div className="pet-stat">
-                  <div className="pet-stat-icon fullness">🥣</div>
-                  <div className="pet-stat-bar">
-                    <div
-                      className="pet-stat-fill fullness"
-                      style={{ width: `${target.fullness}%` }}
-                    />
-                  </div>
-                  <span className="pet-stat-value">{target.fullness}/100</span>
+                <div className="pet-progress-track">
+                  <div
+                    className="pet-progress-fill"
+                    style={{ width: `${Math.min(100, progress)}%` }}
+                  />
                 </div>
               </div>
 
@@ -707,6 +758,45 @@ export default function Dashboard() {
               </button>
             </div>
           )}
+
+          <motion.div
+            className="card finance-calendar-card"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+          >
+            <div className="card-header">
+              <h3 className="card-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Calendar size={20} color="#2563eb" />
+                {calendarMonthLabel}
+              </h3>
+            </div>
+            <div className="finance-calendar-weekdays">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                <span key={day}>{day}</span>
+              ))}
+            </div>
+            <div className="finance-calendar-grid">
+              {calendarCells.map((cell) => (
+                <div
+                  key={cell.key}
+                  className={`finance-calendar-day${cell.isEmpty ? " empty" : ""}${cell.isToday ? " today" : ""}`}
+                >
+                  {!cell.isEmpty && (
+                    <>
+                      <div className="finance-calendar-date">{cell.dayNumber}</div>
+                      <div className="finance-calendar-amount income">
+                        +{money(cell.income)}
+                      </div>
+                      <div className="finance-calendar-amount expense">
+                        -{money(cell.expense)}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.div>
 
           {/* TRANSACTION INPUT */}
           {target && (
@@ -1114,34 +1204,6 @@ export default function Dashboard() {
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* DAILY SPENDING CHART */}
-          {calendarData.length > 0 && (
-            <motion.div
-              className="card"
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.25 }}
-            >
-              <div className="card-header">
-                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Calendar size={20} color="#EF4444" />
-                  Daily Spending
-                </h3>
-              </div>
-              <div style={{ height: 250, width: '100%', marginTop: 16 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={calendarData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 12}} tickFormatter={(value) => `¥${value}`} />
-                    <Tooltip cursor={{fill: '#f3f4f6'}} formatter={(value) => `¥${value.toLocaleString()}`} />
-                    <Bar dataKey="amount" fill="#EF4444" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </motion.div>
-          )}
 
           {/* STATS CARDS */}
           <div

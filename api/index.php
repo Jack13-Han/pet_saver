@@ -46,7 +46,6 @@ set_exception_handler(function($exception) {
 require_once 'config.php';
 
 const MAX_MONEY_AMOUNT = 9999999999999.99;
-const CARE_DAILY_LIMIT = 3;
 const STARTER_AVATAR_TYPES = ['dog', 'cat'];
 const AVATAR_UNLOCKS = [
     [
@@ -330,14 +329,12 @@ if ($path === 'user/active-target' && $method === 'POST') {
 }
 
 if ($path === 'dashboard' && $method === 'GET') {
-    ensureCareActivityType($pdo);
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$userId]);
     $userData = $stmt->fetch();
 
     $stmt = $pdo->prepare("
-    SELECT t.*, a.happiness, a.energy, a.fullness,
-        a.cleanliness, a.level, a.exp,
+    SELECT t.*, a.level, a.exp,
         a.mood, a.accessories
     FROM targets t
     LEFT JOIN avatars a ON t.id = a.target_id
@@ -378,12 +375,9 @@ if ($path === 'dashboard' && $method === 'GET') {
         }
 
         $activeTarget['progress'] = $activeTarget['target_amount'] > 0 ? round(($activeTarget['current_amount'] / $activeTarget['target_amount']) * 100, 1) : 0;
+        $activeTarget['mood'] = moodFromProgress($activeTarget['progress']);
+        $pdo->prepare("UPDATE avatars SET mood = ? WHERE target_id = ?")->execute([$activeTarget['mood'], $activeTarget['id']]);
         $activeTarget['accessories'] = json_decode($activeTarget['accessories'] ?? '[]', true);
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE user_id = ? AND activity_type = 'care' AND activity_date = CURDATE()");
-        $stmt->execute([$userId]);
-        $careActionsToday = (int)$stmt->fetchColumn();
-        $activeTarget['care_actions_today'] = $careActionsToday;
-        $activeTarget['care_actions_remaining'] = max(0, CARE_DAILY_LIMIT - $careActionsToday);
     }
 
     $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t LEFT JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 10");
@@ -434,6 +428,7 @@ if ($path === 'targets' && $method === 'GET') {
         }
 
         $t['progress'] = $t['target_amount'] > 0 ? round(($t['current_amount'] / $t['target_amount']) * 100, 1) : 0;
+        $t['mood'] = moodFromProgress($t['progress']);
         $t['days_left'] = $t['deadline'] ? max(0, (strtotime($t['deadline']) - time()) / 86400) : null;
     }
     successResponse($targets);
@@ -564,15 +559,8 @@ if ($path === 'targets' && $method === 'POST') {
             $status = $progress >= 100 ? 'completed' : 'active';
             $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$totalExcess, $status, $targetId]);
             
-            // update avatar mood
-            $mood = 'neutral';
-            if ($progress >= 100) $mood = 'celebrating';
-            elseif ($progress >= 70) $mood = 'happy';
-            elseif ($progress >= 40) $mood = 'neutral';
-            elseif ($progress > 0) $mood = 'sad';
-            else $mood = 'dirty';
-            $happiness = min(100, max(0, 50 + ($progress - 50)));
-            $pdo->prepare("UPDATE avatars SET mood = ?, happiness = ? WHERE target_id = ?")->execute([$mood, $happiness, $targetId]);
+            $mood = moodFromProgress($progress);
+            $pdo->prepare("UPDATE avatars SET mood = ? WHERE target_id = ?")->execute([$mood, $targetId]);
         }
 
         $pdo->commit();
@@ -625,16 +613,8 @@ if (preg_match('/^targets\/(\d+)$/', $path, $m) && $method === 'PUT') {
         $stmt = $pdo->prepare("UPDATE targets SET name = ?, description = ?, target_amount = ?, category = ?, deadline = ?, avatar_type = ?, avatar_name = ?, status = ? WHERE id = ?");
         $stmt->execute([$name, $description, $targetAmount, $category, $deadline, $avatarType, $avatarName, $status, $targetId]);
 
-        // Update avatar mood based on new progress
-        $mood = 'neutral';
-        if ($progress >= 100) $mood = 'celebrating';
-        elseif ($progress >= 70) $mood = 'happy';
-        elseif ($progress >= 40) $mood = 'neutral';
-        elseif ($progress > 0) $mood = 'sad';
-        else $mood = 'dirty';
-        
-        $happiness = min(100, max(0, 50 + ($progress - 50)));
-        $pdo->prepare("UPDATE avatars SET mood = ?, happiness = ? WHERE target_id = ?")->execute([$mood, $happiness, $targetId]);
+        $mood = moodFromProgress($progress);
+        $pdo->prepare("UPDATE avatars SET mood = ? WHERE target_id = ?")->execute([$mood, $targetId]);
 
         $pdo->commit();
         successResponse(null, 'Target updated');
@@ -710,14 +690,7 @@ if ($path === 'transactions' && $method === 'POST') {
             } else {
                 $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ?")->execute([$newAmount, $status, $targetId]);
             }
-
-            $mood = 'neutral';
-            if ($progress >= 100) $mood = 'celebrating';
-            elseif ($progress >= 70) $mood = 'happy';
-            elseif ($progress >= 40) $mood = 'neutral';
-            elseif ($progress > 0) $mood = 'sad';
-            else $mood = 'dirty';
-
+            $mood = moodFromProgress($progress);
             $pdo->prepare("UPDATE avatars SET mood = ? WHERE target_id = ?")->execute([$mood, $targetId]);
 
             $petReaction = rewardPetForMoneyAction(
@@ -829,12 +802,15 @@ if ($path === 'calendar' && $method === 'GET') {
 
     $stmt = $pdo->prepare("
         SELECT
-            DATE(created_at) as day,
-            SUM(amount) as total
+            DATE(transaction_date) as day,
+            COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) as income,
+            COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0) as expense
         FROM transactions
         WHERE user_id = ?
-        AND type = 'withdrawal'
-        GROUP BY DATE(created_at)
+        AND transaction_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+        AND transaction_date < DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY)
+        GROUP BY DATE(transaction_date)
+        ORDER BY day
     ");
 
     $stmt->execute([$userId]);
@@ -842,76 +818,6 @@ if ($path === 'calendar' && $method === 'GET') {
     successResponse(
         $stmt->fetchAll()
     );
-}
-
-if ($path === 'avatars/care' && $method === 'POST') {
-    $targetId = intval($input['target_id'] ?? 0);
-    $action = $input['action'] ?? '';
-    if (!$targetId || !in_array($action, ['play', 'feed', 'rest', 'shower'])) errorResponse('Invalid care action');
-
-    ensureCareActivityType($pdo);
-    $pdo->beginTransaction();
-    $stmt = $pdo->prepare("SELECT id FROM users WHERE id = ? FOR UPDATE");
-    $stmt->execute([$userId]);
-
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE user_id = ? AND activity_type = 'care' AND activity_date = CURDATE()");
-    $stmt->execute([$userId]);
-    $careActionsToday = (int)$stmt->fetchColumn();
-    if ($careActionsToday >= CARE_DAILY_LIMIT) {
-        $pdo->rollBack();
-        errorResponse('You can take care of your avatar only 3 times per day.', 429);
-    }
-
-    $stmt = $pdo->prepare("SELECT a.* FROM avatars a JOIN targets t ON a.target_id = t.id WHERE a.target_id = ? AND t.user_id = ?");
-    $stmt->execute([$targetId, $userId]);
-    $avatar = $stmt->fetch();
-    if (!$avatar) {
-        $pdo->rollBack();
-        errorResponse('Avatar not found');
-    }
-
-    $updates = [];
-    $expGain = 10;
-    switch ($action) {
-        case 'play':
-            $updates['happiness'] = min(100, $avatar['happiness'] + 10);
-            $updates['energy'] = max(0, $avatar['energy'] - 5);
-            break;
-        case 'feed':
-            $updates['fullness'] = min(100, $avatar['fullness'] + 10);
-            $updates['energy'] = min(100, $avatar['energy'] + 5);
-            break;
-        case 'rest':
-            $updates['energy'] = min(100, $avatar['energy'] + 10);
-            $updates['happiness'] = max(0, $avatar['happiness'] - 2);
-            break;
-        case 'shower':
-            $updates['cleanliness'] = min(100, $avatar['cleanliness'] + 10);
-            $updates['happiness'] = min(100, $avatar['happiness'] + 5);
-            break;
-    }
-
-    $newExp = $avatar['exp'] + $expGain;
-    $newLevel = $avatar['level'];
-    if ($newExp >= $avatar['level'] * 100) {
-        $newLevel++;
-        $newExp = 0;
-    }
-
-    $pdo->prepare("UPDATE avatars SET happiness = ?, energy = ?, fullness = ?, cleanliness = ?, exp = ?, level = ? WHERE target_id = ?")
-        ->execute([$updates['happiness'] ?? $avatar['happiness'], $updates['energy'] ?? $avatar['energy'], $updates['fullness'] ?? $avatar['fullness'], $updates['cleanliness'] ?? $avatar['cleanliness'], $newExp, $newLevel, $targetId]);
-    $pdo->prepare("INSERT INTO activity_log (user_id, activity_type, points, activity_date) VALUES (?, 'care', 0, CURDATE())")
-        ->execute([$userId]);
-    $pdo->commit();
-
-    $careActionsToday++;
-    successResponse([
-        'level' => $newLevel,
-        'exp' => $newExp,
-        'stats' => $updates,
-        'care_actions_today' => $careActionsToday,
-        'care_actions_remaining' => max(0, CARE_DAILY_LIMIT - $careActionsToday),
-    ], 'Avatar cared for!');
 }
 
 if ($path === 'shop' && $method === 'GET') {
@@ -1662,16 +1568,17 @@ function syncTargetFromTransactions($pdo, $userId, $targetId)
     $pdo->prepare("UPDATE targets SET current_amount = ?, status = ? WHERE id = ? AND user_id = ?")
         ->execute([$newAmount, $status, $targetId, $userId]);
 
-    $mood = 'neutral';
-    if ($progress >= 100) $mood = 'celebrating';
-    elseif ($progress >= 70) $mood = 'happy';
-    elseif ($progress >= 40) $mood = 'neutral';
-    elseif ($progress > 0) $mood = 'sad';
-    else $mood = 'dirty';
+    $mood = moodFromProgress($progress);
+    $pdo->prepare("UPDATE avatars SET mood = ? WHERE target_id = ?")
+        ->execute([$mood, $targetId]);
+}
 
-    $happiness = min(100, max(0, 50 + ($progress - 50)));
-    $pdo->prepare("UPDATE avatars SET mood = ?, happiness = ? WHERE target_id = ?")
-        ->execute([$mood, $happiness, $targetId]);
+function moodFromProgress($progress)
+{
+    if ($progress >= 100) return 'celebrating';
+    if ($progress >= 70) return 'happy';
+    if ($progress >= 40) return 'neutral';
+    return 'sad';
 }
 
 function getFinanceOverview($pdo, $userId)

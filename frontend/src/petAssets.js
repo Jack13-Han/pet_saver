@@ -30,11 +30,9 @@ export const avatarEmojis = Object.fromEntries(
 const getPetImageState = (target) => {
   if (!target) return "idle";
   if (target.progress >= 100) return "celebrate";
-  if (target.cleanliness < 30) return "dirty";
-  if (target.happiness < 20) return "sad";
-  if (target.energy < 20) return "angry";
-  if (target.progress >= 50) return "happy";
-  return "idle";
+  if (target.progress >= 70) return "happy";
+  if (target.progress >= 40) return "idle";
+  return "sad";
 };
 
 export const getPetImage = (avatarType = "cat", state = "idle") => {
