@@ -676,6 +676,109 @@ body {
   text-align: right;
 }
 
+.pet-bond-panel {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.72);
+  display: grid;
+  gap: 14px;
+}
+
+.pet-level-row {
+  display: grid;
+  grid-template-columns: minmax(150px, auto) 1fr;
+  align-items: center;
+  gap: 14px;
+}
+
+.pet-level-row > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.pet-level-row span {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.pet-exp-bar {
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: rgba(249, 115, 22, 0.13);
+}
+
+.pet-exp-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f97316, #fbbf24);
+}
+
+.pet-reaction-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #ecfdf5, #ffffff);
+}
+
+.pet-reaction-emoji {
+  font-size: 28px;
+}
+
+.pet-reaction-banner div {
+  display: grid;
+  gap: 3px;
+}
+
+.pet-reaction-banner strong {
+  font-size: 13px;
+  color: #065f46;
+}
+
+.pet-reaction-banner small {
+  color: #047857;
+  font-weight: 800;
+}
+
+.planner-pet-reaction {
+  margin: -4px 0 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.pet-care-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.pet-care-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.pet-care-heading span:not(.care-count) {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.care-count {
+  padding: 5px 9px;
+  border-radius: var(--radius-full);
+  background: var(--accent-orange-light);
+  color: #c2410c;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 /* CARE BUTTONS */
 .care-grid {
   display: grid;

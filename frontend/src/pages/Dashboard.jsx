@@ -52,6 +52,7 @@ export default function Dashboard() {
   const [calendarData, setCalendarData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
+  const [petReaction, setPetReaction] = useState(null);
   const [animatingPet, setAnimatingPet] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveAmount, setSaveAmount] = useState("");
@@ -193,6 +194,13 @@ export default function Dashboard() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const showPetReaction = (reaction) => {
+    if (!reaction) return;
+    setPetReaction(reaction);
+    setAnimatingPet(true);
+    setTimeout(() => setAnimatingPet(false), 1000);
+  };
+
   const handleTransaction = async (type, transactionAmount = "") => {
     if (!transactionAmount) return false;
     const numAmount = parseFloat(transactionAmount);
@@ -209,6 +217,8 @@ export default function Dashboard() {
         }`,
         date: new Date().toISOString().split("T")[0],
       });
+
+      showPetReaction(res.data?.pet_reaction);
 
       setAnimatingPet(true);
       setTimeout(() => setAnimatingPet(false), 1000);
@@ -228,7 +238,9 @@ export default function Dashboard() {
             progress: res.data.progress,
             status: res.data.status,
             mood: res.data.mood,
-            happiness: Math.min(100, prev.activeTarget.happiness + 5),
+            happiness: res.data?.pet_reaction?.happiness ?? prev.activeTarget.happiness,
+            level: res.data?.pet_reaction?.level ?? prev.activeTarget.level,
+            exp: res.data?.pet_reaction?.exp ?? prev.activeTarget.exp,
           },
         }));
 
@@ -253,7 +265,7 @@ export default function Dashboard() {
     if (!data?.activeTarget) return;
 
     try {
-      await txApi.create({
+      const res = await txApi.create({
         target_id: data.activeTarget.id,
         amount: petSavingAmount,
         type: "deposit",
@@ -262,8 +274,7 @@ export default function Dashboard() {
         date: new Date().toISOString().split("T")[0],
       });
 
-      setAnimatingPet(true);
-      setTimeout(() => setAnimatingPet(false), 1000);
+      showPetReaction(res.data?.pet_reaction);
       showToast(`Pet mission complete! Saved ﾂ･${petSavingAmount.toLocaleString()} for ${data.activeTarget.avatar_name}.`);
       loadDashboard();
     } catch (err) {
@@ -282,6 +293,12 @@ export default function Dashboard() {
         target_id: data.activeTarget.id,
         action: action.id,
       });
+      showPetReaction({
+        emoji: action.icon,
+        message: `${data.activeTarget.avatar_name} enjoyed ${action.title.toLowerCase()} time!`,
+        exp_gain: 10,
+        happiness_gain: action.id === "play" ? 10 : action.id === "shower" ? 5 : 0,
+      });
       showToast(`${action.title} completed! ✨`);
       setData((prev) => ({
         ...prev,
@@ -289,6 +306,9 @@ export default function Dashboard() {
           ...prev.activeTarget,
           care_actions_today: res.data.care_actions_today,
           care_actions_remaining: res.data.care_actions_remaining,
+          level: res.data.level,
+          exp: res.data.exp,
+          ...res.data.stats,
         },
       }));
       loadDashboard();
@@ -564,6 +584,66 @@ export default function Dashboard() {
                     />
                   </div>
                   <span className="pet-stat-value">{target.fullness}/100</span>
+                </div>
+              </div>
+
+              <div className="pet-bond-panel">
+                <div className="pet-level-row">
+                  <div>
+                    <strong>Bond Level {target.level || 1}</strong>
+                    <span>{target.exp || 0}/{(target.level || 1) * 100} EXP</span>
+                  </div>
+                  <div className="pet-exp-bar" aria-label="Pet bond experience">
+                    <motion.div
+                      className="pet-exp-fill"
+                      animate={{ width: `${Math.min(100, ((target.exp || 0) / ((target.level || 1) * 100)) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <AnimatePresence mode="wait">
+                  {petReaction && (
+                    <motion.div
+                      key={`${petReaction.message}-${petReaction.exp}`}
+                      className="pet-reaction-banner"
+                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8 }}
+                    >
+                      <span className="pet-reaction-emoji">{petReaction.emoji || "🐾"}</span>
+                      <div>
+                        <strong>{petReaction.message}</strong>
+                        <small>
+                          {petReaction.exp_gain ? `+${petReaction.exp_gain} EXP` : ""}
+                          {petReaction.happiness_gain ? `  •  +${petReaction.happiness_gain} Happiness` : ""}
+                        </small>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="pet-care-heading">
+                  <div>
+                    <strong>Bond with {target.avatar_name}</strong>
+                    <span>Care turns money progress into a daily relationship.</span>
+                  </div>
+                  <span className="care-count">{careActionsRemaining}/3 left</span>
+                </div>
+
+                <div className="care-grid">
+                  {careActions.map((action) => (
+                    <button
+                      type="button"
+                      className="care-btn"
+                      key={action.id}
+                      onClick={() => handleCare(action)}
+                      disabled={careLimitReached}
+                    >
+                      <span className="care-btn-icon">{action.icon}</span>
+                      <span className="care-btn-title">{action.title}</span>
+                      <span className="care-btn-effect">{action.effect}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 

@@ -35,6 +35,7 @@ export default function Planner() {
   const [targets, setTargets] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [petReaction, setPetReaction] = useState(null)
   const [budgetForm, setBudgetForm] = useState({ category: 'Food', monthly_limit: '' })
   const [emergencyForm, setEmergencyForm] = useState({ target_amount: '' })
   const [emergencyDeposit, setEmergencyDeposit] = useState({ amount: '' })
@@ -135,7 +136,7 @@ export default function Planner() {
     if (!overview?.emergency?.id) return
     setSaving(true)
     try {
-      await transactionApi.create({
+      const res = await transactionApi.create({
         target_id: overview.emergency.id,
         amount: Number(emergencyDeposit.amount || 0),
         type: 'deposit',
@@ -143,6 +144,7 @@ export default function Planner() {
         note: 'Emergency fund deposit',
         date: new Date().toISOString().slice(0, 10),
       })
+      setPetReaction(res.data?.pet_reaction || null)
       setEmergencyDeposit({ amount: '' })
       await loadPlanner()
     } catch (err) {
@@ -190,6 +192,7 @@ export default function Planner() {
   const claimMission = async (missionId) => {
     const res = await finance.claimMission(missionId)
     updateUser({ coins: (user?.coins || 0) + (res.data?.coins || 0) })
+    setPetReaction(res.data?.pet_reaction || null)
     await loadPlanner()
   }
 
@@ -223,6 +226,20 @@ export default function Planner() {
           <Download size={18} /> Export CSV
         </button>
       </div>
+
+      {petReaction && (
+        <motion.div
+          className="pet-reaction-banner planner-pet-reaction"
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <span className="pet-reaction-emoji">{petReaction.emoji || '🐾'}</span>
+          <div>
+            <strong>{petReaction.message}</strong>
+            <small>+{petReaction.exp_gain || 0} Pet EXP • Money progress became pet progress</small>
+          </div>
+        </motion.div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
         <SummaryCard icon={WalletCards} label="This Month Spent" value={money(overview?.month?.spent)} tone="#ef4444" />
