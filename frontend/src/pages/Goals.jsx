@@ -91,6 +91,7 @@ export default function Goals() {
   }
 
   const regularGoals = goals.filter(goal => (
+    goal.status === 'active' &&
     goal.category !== 'Emergency' &&
     !String(goal.name || '').toLowerCase().includes('emergency')
   ))

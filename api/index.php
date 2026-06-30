@@ -344,6 +344,11 @@ if ($path === 'dashboard' && $method === 'GET') {
     $stmt->execute([$userId]);
     $activeTarget = $stmt->fetch();
 
+    if (!$activeTarget && $userData['active_target_id'] !== null) {
+        $pdo->prepare("UPDATE users SET active_target_id = NULL WHERE id = ?")->execute([$userId]);
+        $userData['active_target_id'] = null;
+    }
+
     if ($activeTarget) {
         // Self-healing: associate orphaned transactions with the active target
         $stmt = $pdo->prepare("SELECT id FROM targets WHERE user_id = ?");
