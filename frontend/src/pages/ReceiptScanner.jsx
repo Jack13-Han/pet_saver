@@ -128,6 +128,7 @@ export default function ReceiptScanner() {
   const [receipts, setReceipts] = useState([])
   const [selectedTarget, setSelectedTarget] = useState('')
   const [saving, setSaving] = useState(false)
+  const [petReaction, setPetReaction] = useState(null)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef(null)
 
@@ -194,7 +195,7 @@ export default function ReceiptScanner() {
     setSaving(true)
 
     try {
-      await receiptApi.create({
+      const response = await receiptApi.create({
         shop_name: result.shop_name,
         total_price: result.total_price,
         date: result.date,
@@ -204,7 +205,8 @@ export default function ReceiptScanner() {
         image_path: image
       })
 
-      alert(`Receipt recorded! ¥${result.total_price.toLocaleString()} saved as Expense!`)
+      setPetReaction(response.data?.pet_reaction || null)
+      alert(`${response.data?.pet_reaction?.message || 'Receipt recorded!'} ¥${result.total_price.toLocaleString()} saved as Expense!`)
       setImage(null)
       setResult(null)
       setSelectedTarget('')
@@ -230,6 +232,20 @@ export default function ReceiptScanner() {
           <span>BEST FEATURE</span>
         </div>
       </div>
+
+      {petReaction && (
+        <motion.div
+          className="pet-reaction-banner planner-pet-reaction"
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <span className="pet-reaction-emoji">{petReaction.emoji || '🧾'}</span>
+          <div>
+            <strong>{petReaction.message}</strong>
+            <small>+{petReaction.exp_gain || 0} Pet EXP for tracking your money</small>
+          </div>
+        </motion.div>
+      )}
 
       <div className="scanner-container">
         <AnimatePresence mode="wait">

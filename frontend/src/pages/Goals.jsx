@@ -90,6 +90,12 @@ export default function Goals() {
     return Boolean(avatarShopMap[type.id]?.owned)
   }
 
+  const regularGoals = goals.filter(goal => (
+    goal.status === 'active' &&
+    goal.category !== 'Emergency' &&
+    !String(goal.name || '').toLowerCase().includes('emergency')
+  ))
+
   const confirmDelete = async () => {
     if (!deleteTarget) return
     try {
@@ -111,7 +117,7 @@ export default function Goals() {
           <h2>My Goals 🎯</h2>
           <p>Set targets and watch your pet grow!</p>
         </div>
-        {activeGoals.length === 0 ? (
+        {regularGoals.length === 0 ? (
           <button className="btn btn-primary" onClick={() => setShowModal(true)}>
             <Plus size={18} /> New Goal
           </button>
@@ -201,15 +207,15 @@ export default function Goals() {
                   </div>
                   <div className="goal-progress-section">
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <span style={{ fontWeight: 700, color: '#10b981' }}>¥{parseInt(goal.target_amount).toLocaleString()}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--accent-green)' }}>¥{parseInt(goal.target_amount).toLocaleString()}</span>
                       <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>Target Met!</span>
                     </div>
-                    <div className="goal-progress-bar" style={{ background: '#dcfce7' }}>
-                      <div className="goal-progress-fill" style={{ width: '100%', background: '#10b981' }} />
+                    <div className="goal-progress-bar" style={{ background: 'var(--accent-green-light)' }}>
+                      <div className="goal-progress-fill" style={{ width: '100%', background: 'var(--accent-green)' }} />
                     </div>
                   </div>
-                  <div style={{ marginTop: 12, padding: 10, background: '#dcfce7', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#047857' }}>
+                  <div style={{ marginTop: 12, padding: 10, background: 'var(--accent-green-light)', borderRadius: 'var(--radius-md)', textAlign: 'center' }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-green-dark)' }}>
                       🎉 Goal Successfully Reached!
                     </span>
                   </div>

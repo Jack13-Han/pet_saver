@@ -15,6 +15,10 @@ dist/
 # OS
 .DS_Store
 
+# Local generated files
+*.log
+outputs/
+tools/
 
 .env
 *.env

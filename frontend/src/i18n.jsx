@@ -8,6 +8,11 @@ const LANGUAGES = [
   { code: "zh", label: "Chinese" },
 ];
 
+LANGUAGES.find((language) => language.code === "ja").label = "Japanese (日本語)";
+LANGUAGES.splice(2);
+
+const SUPPORTED_LANG_CODES = new Set(LANGUAGES.map((language) => language.code));
+
 const DICTIONARIES = {
   ja: {
     "Loading Pet Saver...": "Pet Saverを読み込み中...",
@@ -690,6 +695,165 @@ const FEATURE_TRANSLATIONS = {
   },
 };
 
+const CLEAN_TRANSLATIONS = {
+  ja: {
+    "Loading Pet Saver...": "Pet Saverを読み込み中...",
+    "Grow with your savings": "貯金と一緒に成長しよう",
+    Home: "ホーム",
+    Dashboard: "ダッシュボード",
+    Goals: "目標",
+    Expenses: "支出",
+    Insights: "分析",
+    Planner: "プランナー",
+    "Expense Analyst": "支出アナリスト",
+    "Receipt Scanner": "レシートスキャナー",
+    Shop: "ショップ",
+    Achievements: "実績",
+    Rankings: "ランキング",
+    Settings: "設定",
+    Coins: "コイン",
+    Logout: "ログアウト",
+    __helloUser: "こんにちは、{user}さん！",
+    "Take care of your pet and reach your goals!": "ペットをお世話しながら目標達成を目指しましょう！",
+    "Set targets and watch your pet grow!": "目標を立ててペットの成長を見守りましょう！",
+    "Unlock new avatars for your savings goals.": "貯金目標で使える新しいアバターを解放しましょう。",
+    "Spending Insights": "支出インサイト",
+    "Detailed breakdown of your expenses and savings": "支出と貯金の内訳を詳しく確認できます",
+    "Total Expenses": "支出合計",
+    "Total Savings": "貯金合計",
+    "Savings Rate": "貯金率",
+    "Sum of all withdrawals logged": "記録された支出の合計",
+    "Sum of all savings deposits": "記録された貯金の合計",
+    "Category Breakdown": "カテゴリ別内訳",
+    "Category Details": "カテゴリ詳細",
+    "Monthly Spending Trend": "月別支出の推移",
+    "Smart Saving Advice": "スマート貯金アドバイス",
+    "No spending data recorded yet.": "まだ支出データがありません。",
+    "No category details available.": "カテゴリ詳細はまだありません。",
+    "No monthly spending records found.": "月別支出の記録はまだありません。",
+    "Control Shopping Expenses": "買い物の支出をコントロール",
+    "AI Spending Coach": "AI支出コーチ",
+    "Goal Forecast": "目標予測",
+    "Money Planner": "マネープランナー",
+    "Budgets, recurring money, missions, forecasts, receipts, and export in one place": "予算、定期支出、ミッション、予測、レシート、CSV出力をまとめて管理できます",
+    "Export CSV": "CSV出力",
+    "This Month Spent": "今月の支出",
+    "This Month Saved": "今月の貯金",
+    "Month-End Estimate": "月末予測",
+    "Emergency Fund": "緊急資金",
+    "Not set": "未設定",
+    "Add money": "入金額",
+    "Add Money": "入金",
+    "Emergency target": "緊急資金の目標額",
+    "Budget Limits": "予算上限",
+    "Monthly limit": "月の上限",
+    "Add category budgets to unlock automatic warnings.": "カテゴリ予算を追加すると、自動警告が使えるようになります。",
+    "Recurring Savings and Expenses": "定期的な貯金と支出",
+    "Due items run automatically when you open the app. Delete a recurring item when a subscription or payment stops.": "期限が来た項目はアプリを開くと自動で記録されます。サブスクや支払いが止まったら定期項目を削除してください。",
+    Name: "名前",
+    Amount: "金額",
+    Expense: "支出",
+    Savings: "貯金",
+    Monthly: "毎月",
+    Weekly: "毎週",
+    "Active goal": "現在の目標",
+    Add: "追加",
+    "No recurring entries yet.": "定期項目はまだありません。",
+    "Build the next useful signal": "次の有用なサインを作りましょう",
+    "Add at least one budget and one recurring item so Pet Saver can warn you before money leaks happen.": "予算と定期項目を1つずつ追加すると、お金の使いすぎを事前に確認できます。",
+    "Needs savings pace": "貯金ペースが必要です",
+    Missions: "ミッション",
+    Claimed: "受け取り済み",
+    "Create an active goal to see a forecast.": "予測を見るには有効な目標を作成してください。",
+    "Save once today": "今日1回貯金する",
+    "Record any savings deposit today.": "今日の貯金を1件記録しましょう。",
+    "3 days no shopping": "3日間買い物なし",
+    "Avoid Shopping expenses for 3 separate days this week.": "今週3日間、買い物の支出を避けましょう。",
+    "Stay under every budget": "すべての予算内に収める",
+    "Keep all monthly category budgets under 100%.": "すべての月間カテゴリ予算を100%未満に保ちましょう。",
+    "Rabbit Avatar": "うさぎアバター",
+    "Pig Avatar": "ぶたアバター",
+    "Bird Avatar": "鳥アバター",
+    "Naruto Avatar": "ナルトアバター",
+    "Pikachu Avatar": "ピカチュウアバター",
+    "Chiikawa Avatar": "ちいかわアバター",
+    "Lufy Avatar": "ルフィアバター",
+    "Unlock the rabbit avatar for new goals": "新しい目標で使えるうさぎアバターを解放",
+    "Unlock the pig avatar for new goals": "新しい目標で使えるぶたアバターを解放",
+    "Unlock the bird avatar for new goals": "新しい目標で使える鳥アバターを解放",
+    "Unlock the Naruto avatar for new goals": "新しい目標で使えるナルトアバターを解放",
+    "Unlock the Pikachu avatar for new goals": "新しい目標で使えるピカチュウアバターを解放",
+    "Unlock the Chiikawa avatar for new goals": "新しい目標で使えるちいかわアバターを解放",
+    "Unlock the Lufy avatar for new goals": "新しい目標で使えるルフィアバターを解放",
+    Owned: "所持済み",
+    "Need coins": "コイン不足",
+    "Buying...": "購入中...",
+    Buy: "購入",
+    "Snap a receipt, auto-detect details, save instantly!": "レシートを撮って自動読み取り、すぐに保存できます！",
+    "BEST FEATURE": "注目機能",
+    "Take a Photo or Upload Receipt": "写真を撮る、またはレシートをアップロード",
+    "Drag & drop or click to select an image": "ドラッグ＆ドロップ、またはクリックして画像を選択",
+    "Choose File": "ファイルを選択",
+    "Scanning receipt...": "レシートを読み取り中...",
+    "Gemini AI is detecting shop, price, and date": "Gemini AIが店名、金額、日付を読み取っています",
+    "AI scan could not read this receipt. Please enter the details manually.": "AIがレシートを読み取れませんでした。手動で入力してください。",
+    "Shop Name": "店名",
+    "Total Price": "合計金額",
+    "Total Price (ﾂ･)": "合計金額 (¥)",
+    Date: "日付",
+    Category: "カテゴリ",
+    "Items Detected": "読み取った項目",
+    "Total Spending": "支出合計",
+    "Deduct from Savings Goal (Optional)": "貯金目標から差し引く（任意）",
+    "Don't connect to savings goal": "貯金目標に連携しない",
+    "This expense will be deducted from your selected savings goal.": "この支出は選択した貯金目標から差し引かれます。",
+    "Record Expense & Save": "支出を記録して保存",
+    "Recording...": "記録中...",
+    "Receipt History": "レシート履歴",
+    "No scanned receipts yet.": "スキャンしたレシートはまだありません。",
+    "Unknown Shop": "不明な店舗",
+    "Keep saving to help your pet grow!": "貯金を続けてペットを成長させよう！",
+    "Day Streak": "日連続",
+    "Quick Save": "クイック貯金",
+    "Current Goal": "現在の目標",
+    "Edit Goal": "目標を編集",
+    "Pet Status": "ペットの状態",
+    "View All": "すべて見る",
+    "No active goal": "有効な目標がありません",
+    "Create Goal": "目標を作成",
+    "My Goals": "私の目標",
+    "Create New Goal": "新しい目標を作成",
+    "Target Amount": "目標金額",
+    Deadline: "期限",
+    Cancel: "キャンセル",
+    Create: "作成",
+    Save: "保存",
+    Saved: "貯金済み",
+    Saving: "保存中",
+    "Saving...": "保存中...",
+    "Save Changes": "変更を保存",
+    "Save Receipt": "レシートを保存",
+    "Goal Completed!": "目標達成！",
+    "Your pet is happy!": "ペットが喜んでいます！",
+    "Pet needs more savings!": "もっと貯金が必要です！",
+    "Keep saving!": "貯金を続けよう！",
+    "Complete current goal first!": "先に現在の目標を達成してください！",
+    Profile: "プロフィール",
+    Notifications: "通知",
+    Privacy: "プライバシー",
+    Appearance: "表示",
+    Language: "言語",
+    "Choose app language": "アプリの言語を選択",
+    "Dark Mode": "ダークモード",
+    "Switch to dark theme": "ダークテーマに切り替える",
+    "Public Profile": "公開プロフィール",
+    "Show on Leaderboard": "ランキングに表示",
+    "Settings saved!": "設定を保存しました！",
+    "Failed to save settings": "設定の保存に失敗しました",
+    "Failed to save privacy setting": "プライバシー設定の保存に失敗しました",
+  },
+};
+
 const LanguageContext = createContext(null);
 
 const textNodeOriginals = new WeakMap();
@@ -705,6 +869,34 @@ function translateDynamic(text, dict) {
   const trimmed = text.trim();
   const fill = (template, values) =>
     Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{${key}}`, value), template);
+
+  const helloMatch = trimmed.match(/^Hello,\s+(.+)!/);
+  if (helloMatch && dict.__helloUser) {
+    return preserveSpacing(text, fill(dict.__helloUser, { user: helloMatch[1] }));
+  }
+
+  const streakMatch = trimmed.match(/^(\d+)\s+Day Streak$/);
+  if (streakMatch && dict["Day Streak"]) {
+    return preserveSpacing(text, `${streakMatch[1]}${dict["Day Streak"]}`);
+  }
+
+  const coinsMatch = trimmed.match(/^(\d+)\s+Coins$/);
+  if (coinsMatch && dict.Coins) {
+    return preserveSpacing(text, `${coinsMatch[1]} ${dict.Coins}`);
+  }
+
+  const titledLabels = [
+    "My Goals",
+    "Shop",
+    "Spending Insights",
+    "AI Spending Coach",
+    "Goal Forecast",
+  ];
+  for (const label of titledLabels) {
+    if (trimmed.startsWith(label) && dict[label]) {
+      return preserveSpacing(text, trimmed.replace(label, dict[label]));
+    }
+  }
 
   const levelMatch = trimmed.match(/^Level (.+)$/);
   if (levelMatch) return preserveSpacing(text, `${dict.Level || "Level"} ${levelMatch[1]}`);
@@ -765,9 +957,19 @@ function translateDynamic(text, dict) {
     }));
   }
 
+  const remainingYenMatch = trimmed.match(/^Remaining Yen (.+) for (.+)\.$/);
+  if (remainingYenMatch) {
+    return preserveSpacing(text, `${remainingYenMatch[2]}まで残り¥${remainingYenMatch[1]}です。`);
+  }
+
   const claimCoinsMatch = trimmed.match(/^Claim (\d+) coins$/);
   if (claimCoinsMatch && dict["Claim {coins} coins"]) {
     return preserveSpacing(text, fill(dict["Claim {coins} coins"], { coins: claimCoinsMatch[1] }));
+  }
+
+  const shoppingPercentMatch = trimmed.match(/^Shopping is (.+)% of your spending\. Try waiting 24 hours before non-essential purchases\.$/);
+  if (shoppingPercentMatch) {
+    return preserveSpacing(text, `買い物が支出の${shoppingPercentMatch[1]}%を占めています。不要な買い物は24時間待ってから判断しましょう。`);
   }
 
   const recurringMetaMatch = trimmed.match(/^(weekly|monthly)\s+.+\s+next\s+(.+)\s+.+\s+(.+)$/);
@@ -781,7 +983,7 @@ function translateDynamic(text, dict) {
 function translateText(text, language) {
   if (language === "en") return text;
 
-  const dict = { ...(DICTIONARIES[language] || {}), ...(FEATURE_TRANSLATIONS[language] || {}) };
+  const dict = { ...(DICTIONARIES[language] || {}), ...(FEATURE_TRANSLATIONS[language] || {}), ...(CLEAN_TRANSLATIONS[language] || {}) };
   const trimmed = text.trim();
   if (!trimmed) return text;
 
@@ -789,14 +991,7 @@ function translateText(text, language) {
   const dynamic = translateDynamic(text, dict);
   if (dynamic) return dynamic;
 
-  let translated = trimmed;
-  for (const [source, target] of Object.entries(dict)) {
-    if (source.length > 3 && translated.includes(source)) {
-      translated = translated.replaceAll(source, target);
-    }
-  }
-
-  return translated === trimmed ? text : preserveSpacing(text, translated);
+  return text;
 }
 
 function translateNodeTree(root, language) {
@@ -837,11 +1032,15 @@ function translateNodeTree(root, language) {
 }
 
 export function LanguageProvider({ children }) {
-  const [language, setLanguageState] = useState(() => localStorage.getItem("language") || "en");
+  const [language, setLanguageState] = useState(() => {
+    const savedLanguage = localStorage.getItem("language") || "en";
+    return SUPPORTED_LANG_CODES.has(savedLanguage) ? savedLanguage : "en";
+  });
 
   const setLanguage = (nextLanguage) => {
-    localStorage.setItem("language", nextLanguage);
-    setLanguageState(nextLanguage);
+    const safeLanguage = SUPPORTED_LANG_CODES.has(nextLanguage) ? nextLanguage : "en";
+    localStorage.setItem("language", safeLanguage);
+    setLanguageState(safeLanguage);
   };
 
   useEffect(() => {

@@ -71,20 +71,20 @@ export function AuthProvider({ children }) {
 
     const apiFields = ["username", "email", "public_profile", "show_on_leaderboard"];
     const hasApiField = Object.keys(payload || {}).some(key => apiFields.includes(key));
-    
+
     let responseData = {};
     if (hasApiField) {
       const res = await userApi.update(payload);
       responseData = res.data || res;
     }
-    
+
     let nextUser;
     setUser((currentUser) => {
       nextUser = { ...currentUser, ...payload, ...responseData };
       localStorage.setItem("user", JSON.stringify(nextUser));
       return nextUser;
     });
-    
+
     return nextUser || { ...user, ...payload, ...responseData };
   };
 
