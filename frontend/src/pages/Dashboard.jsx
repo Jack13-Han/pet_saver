@@ -259,9 +259,9 @@ export default function Dashboard() {
 
     const now = new Date();
     const todayKey = formatDateKey(now);
-    const monthDate = new Date(year, month, 1);
-    const firstDay = new Date(year, month, 1);
-    const totalDays = new Date(year, month + 1, 0).getDate();
+    const monthDate = new Date(year, month, 1, 12, 0, 0);
+    const firstDay = new Date(year, month, 1, 12, 0, 0);
+    const totalDays = new Date(year, month + 1, 0, 12, 0, 0).getDate();
 
     const totalsByDay = new Map(
       calendarData.map((item) => [
@@ -280,7 +280,7 @@ export default function Dashboard() {
 
     const dayCells = Array.from({ length: totalDays }, (_, index) => {
       const dayNumber = index + 1;
-      const key = formatDateKey(new Date(year, month, dayNumber));
+      const key = formatDateKey(new Date(year, month, dayNumber, 12, 0, 0));
       const totals = totalsByDay.get(key) || { income: 0, expense: 0 };
 
       return {
@@ -1113,12 +1113,16 @@ export default function Dashboard() {
                     {!cell.isEmpty && (
                       <>
                         <div className="finance-calendar-date">{cell.dayNumber}</div>
-                        <div className="finance-calendar-amount income">
-                          +{money(cell.income)}
-                        </div>
-                        <div className="finance-calendar-amount expense">
-                          -{money(cell.expense)}
-                        </div>
+                        {cell.income > 0 && (
+                          <div className="finance-calendar-amount income">
+                            +{money(cell.income)}
+                          </div>
+                        )}
+                        {cell.expense > 0 && (
+                          <div className="finance-calendar-amount expense">
+                            -{money(cell.expense)}
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
