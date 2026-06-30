@@ -23,7 +23,6 @@ import {
   Gift,
   CheckCircle2,
   BookOpen,
-  X,
   ArrowRight,
 } from "lucide-react";
 import {
