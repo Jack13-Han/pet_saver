@@ -1061,6 +1061,10 @@ if ($path === 'finance/overview' && $method === 'GET') {
     successResponse(getFinanceOverview($pdo, $userId));
 }
 
+if ($path === 'finance/weekly-report' && $method === 'GET') {
+    successResponse(getWeeklyFinanceReport($pdo, $userId));
+}
+
 if ($path === 'finance/export' && $method === 'GET') {
     $stmt = $pdo->prepare("
         SELECT t.transaction_date, t.type, t.category, t.amount, t.note, tg.name AS target_name
@@ -1857,8 +1861,128 @@ function checkAchievements($pdo, $userId)
         UPDATE achievements
         SET unlocked_at =
             IF(is_unlocked = 1 AND unlocked_at IS NULL, NOW(), unlocked_at)
-        WHERE user_id = ?
     ")->execute([$userId]);
+}
+
+function getWeeklyFinanceReport($pdo, $userId) {
+    $sevenDaysAgo = date('Y-m-d', strtotime('-7 days'));
+    $today = date('Y-m-d');
+    
+    // Get total savings (deposits) in the last 7 days
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(amount), 0)
+        FROM transactions
+        WHERE user_id = ? AND type = 'deposit' AND transaction_date BETWEEN ? AND ?
+    ");
+    $stmt->execute([$userId, $sevenDaysAgo, $today]);
+    $weeklySavings = (float)$stmt->fetchColumn();
+
+    // Get total spent (withdrawals) in the last 7 days
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(amount), 0)
+        FROM transactions
+        WHERE user_id = ? AND type = 'withdrawal' AND transaction_date BETWEEN ? AND ?
+    ");
+    $stmt->execute([$userId, $sevenDaysAgo, $today]);
+    $weeklySpending = (float)$stmt->fetchColumn();
+
+    // Get top spending category in the last 7 days
+    $stmt = $pdo->prepare("
+        SELECT category, SUM(amount) as total
+        FROM transactions
+        WHERE user_id = ? AND type = 'withdrawal' AND transaction_date BETWEEN ? AND ?
+        GROUP BY category
+        ORDER BY total DESC
+        LIMIT 1
+    ");
+    $stmt->execute([$userId, $sevenDaysAgo, $today]);
+    $topCategoryRow = $stmt->fetch();
+    $topCategory = $topCategoryRow ? $topCategoryRow['category'] : 'None';
+    $topCategoryTotal = $topCategoryRow ? (float)$topCategoryRow['total'] : 0;
+
+    // Get active target name and progress if any
+    $stmt = $pdo->prepare("
+        SELECT t.name, t.target_amount, t.current_amount, t.avatar_name, t.avatar_type
+        FROM targets t
+        WHERE t.user_id = ? AND t.status = 'active'
+        LIMIT 1
+    ");
+    $stmt->execute([$userId]);
+    $activeTarget = $stmt->fetch();
+
+    // Fetch last 10 transactions in the last 7 days to give context
+    $stmt = $pdo->prepare("
+        SELECT type, category, amount, note, transaction_date
+        FROM transactions
+        WHERE user_id = ? AND transaction_date BETWEEN ? AND ?
+        ORDER BY transaction_date DESC, id DESC
+        LIMIT 10
+    ");
+    $stmt->execute([$userId, $sevenDaysAgo, $today]);
+    $recentTx = $stmt->fetchAll();
+    
+    $txSummary = "";
+    foreach ($recentTx as $tx) {
+        $txSummary .= "- " . $tx['transaction_date'] . ": " . ($tx['type'] === 'deposit' ? 'Saved' : 'Spent') . " Yen " . number_format($tx['amount']) . " on " . ($tx['category'] ?: 'General') . " (" . $tx['note'] . ")\n";
+    }
+
+    $apiKey = getenv('GEMINI_API_KEY') ?: ($_ENV['GEMINI_API_KEY'] ?? '');
+    if ($apiKey === '') {
+        $apiKey = getenv('VITE_GEMINI_API_KEY') ?: ($_ENV['VITE_GEMINI_API_KEY'] ?? '');
+    }
+    if ($apiKey === '' && defined('GEMINI_API_KEY')) {
+        $apiKey = GEMINI_API_KEY;
+    }
+
+    if ($apiKey === '') {
+        return [
+            'report' => "Weekly analysis report generation failed: Gemini API key is missing."
+        ];
+    }
+
+    $petName = $activeTarget ? $activeTarget['avatar_name'] : 'Mochi';
+    $petType = $activeTarget ? $activeTarget['avatar_type'] : 'dog';
+    $targetName = $activeTarget ? $activeTarget['name'] : 'None';
+    $targetAmount = $activeTarget ? $activeTarget['target_amount'] : 0;
+    $currentAmount = $activeTarget ? $activeTarget['current_amount'] : 0;
+
+    $prompt = "You are a financial advisor and virtual companion pet coach. Analyze the user's transaction data for the past 7 days:
+- User total savings this week: Yen " . number_format($weeklySavings) . "
+- User total spending this week: Yen " . number_format($weeklySpending) . "
+- Top spending category this week: " . $topCategory . " (Yen " . number_format($topCategoryTotal) . ")
+- Active Goal: " . $targetName . " (Yen " . number_format($currentAmount) . " / " . number_format($targetAmount) . ")
+- Virtual Pet Companion: " . $petName . " (Type: " . $petType . ")
+- Recent transactions list:\n" . ($txSummary ?: "No transactions recorded this week.") . "
+
+Provide a Weekly Financial Analysis Report in Burmese language. Keep it very engaging, friendly, and structured. 
+Use bullet points, relevant emojis, and bold headers. 
+Mention the virtual pet by name (" . $petName . ") and describe how the user's spending/saving habits might impact the pet's feelings or goals (e.g., if savings are high, " . $petName . " is excited and happy; if spending is high or goal progress is stalled, suggest minor adjustments to cheer up " . $petName . ").
+Keep the total response under 250 words.";
+
+    $payload = [
+        'contents' => [[
+            'role' => 'user',
+            'parts' => [
+                ['text' => $prompt]
+            ]
+        ]]
+    ];
+
+    $endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . rawurlencode($apiKey);
+    [$status, $body] = postJson($endpoint, $payload);
+
+    if ($status < 200 || $status >= 300) {
+        return [
+            'report' => "Weekly AI report currently unavailable. (HTTP " . $status . ")"
+        ];
+    }
+
+    $decoded = json_decode($body, true);
+    $reportText = $decoded['candidates'][0]['content']['parts'][0]['text'] ?? 'AI could not generate the weekly report.';
+
+    return [
+        'report' => trim($reportText)
+    ];
 }
 
 function updateRank($pdo, $userId)
