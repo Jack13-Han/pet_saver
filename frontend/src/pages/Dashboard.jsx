@@ -237,10 +237,10 @@ export default function Dashboard() {
     maxWidth: 420,
     overflow: "hidden",
     borderRadius: 28,
-    border: "1px solid rgba(148, 163, 184, 0.18)",
-    background: "linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%)",
-    color: "#1f2937",
-    boxShadow: "0 28px 70px rgba(15, 23, 42, 0.18)",
+    border: "1px solid var(--border-color)",
+    background: "var(--bg-card)",
+    color: "var(--text-primary)",
+    boxShadow: "0 28px 70px rgba(0, 0, 0, 0.15)",
   };
 
   const calendarMonthLabel = useMemo(
@@ -921,8 +921,8 @@ export default function Dashboard() {
                   border: "1px solid rgba(16, 185, 129, 0.22)",
                   borderRadius: 12,
                   background: savedToday
-                    ? "linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)"
-                    : "linear-gradient(135deg, #fff7ed 0%, #ffffff 100%)",
+                    ? "linear-gradient(135deg, var(--accent-green-light) 0%, var(--bg-card) 100%)"
+                    : "linear-gradient(135deg, var(--accent-orange-light) 0%, var(--bg-card) 100%)",
                   display: "grid",
                   gap: 12,
                 }}
@@ -1065,9 +1065,9 @@ export default function Dashboard() {
                         width: 40,
                         height: 40,
                         borderRadius: 9999,
-                        background: "#f3f4f6",
+                        background: "var(--bg-primary)",
                         border: "none",
-                        color: "#4b5563",
+                        color: "var(--text-secondary)",
                         display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1098,9 +1098,9 @@ export default function Dashboard() {
                         width: 40,
                         height: 40,
                         borderRadius: 9999,
-                        background: "#f3f4f6",
+                        background: "var(--bg-primary)",
                         border: "none",
-                        color: "#4b5563",
+                        color: "var(--text-secondary)",
                         display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -1134,12 +1134,12 @@ export default function Dashboard() {
                         borderRadius: 12,
                         border:
                           transactionType === "deposit"
-                            ? "1px solid #10b981"
-                            : "1px solid #e5e7eb",
+                            ? "1px solid var(--accent-green)"
+                            : "1px solid var(--border-color)",
                         background:
-                          transactionType === "deposit" ? "#ecfdf5" : "#ffffff",
+                          transactionType === "deposit" ? "var(--accent-green-light)" : "var(--bg-card)",
                         color:
-                          transactionType === "deposit" ? "#047857" : "#6b7280",
+                          transactionType === "deposit" ? "var(--accent-green-dark)" : "var(--text-secondary)",
                         padding: "10px 12px",
                         fontSize: 14,
                         fontWeight: 700,
@@ -1160,15 +1160,15 @@ export default function Dashboard() {
                         border:
                           transactionType === "withdrawal"
                             ? "1px solid #f43f5e"
-                            : "1px solid #e5e7eb",
+                            : "1px solid var(--border-color)",
                         background:
                           transactionType === "withdrawal"
-                            ? "#fff1f2"
-                            : "#ffffff",
+                            ? "rgba(244, 63, 94, 0.16)"
+                            : "var(--bg-card)",
                         color:
                           transactionType === "withdrawal"
-                            ? "#e11d48"
-                            : "#6b7280",
+                            ? "#f43f5e"
+                            : "var(--text-secondary)",
                         padding: "10px 12px",
                         fontSize: 14,
                         fontWeight: 700,
@@ -1182,9 +1182,9 @@ export default function Dashboard() {
                       className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-300"
                       style={{
                         borderRadius: 12,
-                        border: "1px solid #e5e7eb",
-                        background: "#ffffff",
-                        color: "#cbd5e1",
+                        border: "1px solid var(--border-color)",
+                        background: "var(--bg-secondary)",
+                        color: "var(--text-muted)",
                         padding: "10px 12px",
                         fontSize: 14,
                         fontWeight: 700,
@@ -1204,7 +1204,7 @@ export default function Dashboard() {
                       justifyContent: "space-between",
                       gap: 12,
                       paddingBottom: 12,
-                      borderBottom: "1px solid #e5e7eb",
+                      borderBottom: "1px solid var(--border-color)",
                     }}
                   >
                     <div>
@@ -1216,7 +1216,7 @@ export default function Dashboard() {
                         style={{
                           fontSize: 15,
                           fontWeight: 700,
-                          color: "#111827",
+                          color: "var(--text-primary)",
                         }}
                       >
                         {quickSaveDate}
@@ -1298,7 +1298,7 @@ export default function Dashboard() {
                             background: "transparent",
                             fontSize: 20,
                             fontWeight: 700,
-                            color: "#111827",
+                            color: "var(--text-primary)",
                           }}
                           value={saveAmount}
                           onChange={(e) => setSaveAmount(e.target.value)}
@@ -1324,7 +1324,7 @@ export default function Dashboard() {
                         style={{
                           width: "100%",
                           borderRadius: 16,
-                          background: "#f8fafc",
+                          background: "var(--bg-secondary)",
                         }}
                         value={transactionCategory}
                         onChange={(e) => setTransactionCategory(e.target.value)}
@@ -1404,9 +1404,9 @@ export default function Dashboard() {
                         style={{
                           minHeight: 48,
                           borderRadius: 16,
-                          border: "1px solid #e5e7eb",
-                          background: "#ffffff",
-                          color: "#374151",
+                          border: "1px solid var(--border-color)",
+                          background: "var(--bg-secondary)",
+                          color: "var(--text-primary)",
                           fontSize: 15,
                           fontWeight: 700,
                         }}
@@ -1571,11 +1571,11 @@ export default function Dashboard() {
                   width: 48,
                   height: 48,
                   borderRadius: 12,
-                  background: "#E8E5FF",
+                  background: "var(--accent-purple-light, rgba(167, 139, 250, 0.16))",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#7C3AED",
+                  color: "var(--accent-purple)",
                 }}
               >
                 <Award size={24} />
