@@ -11,6 +11,11 @@ export default function Rankings() {
   const [rankings, setRankings] = useState([])
   const [loading, setLoading] = useState(true)
   const { user } = useAuth()
+  const podiumEntries = [
+    rankings[1] && { user: rankings[1], position: 2, height: 140 },
+    rankings[0] && { user: rankings[0], position: 1, height: 180 },
+    rankings[2] && { user: rankings[2], position: 3, height: 120 },
+  ].filter(Boolean)
 
   useEffect(() => { loadRankings() }, [])
 
@@ -33,11 +38,7 @@ export default function Rankings() {
 
       {/* TOP 3 PODIUM */}
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 16, marginBottom: 32, minHeight: 200 }}>
-        {rankings.slice(0, 3).map((r, i) => {
-          const heights = [140, 180, 120]
-          const positions = [2, 1, 3]
-          const position = positions[i]
-          const height = heights[i]
+        {podiumEntries.map(({ user: r, position, height }, i) => {
           const isCurrentUser = user?.id === r.id
           return (
             <motion.div key={r.id} initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.2, duration: 0.5 }}

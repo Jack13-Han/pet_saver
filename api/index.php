@@ -766,8 +766,6 @@ if ($path === 'calendar' && $method === 'GET') {
             COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0) as expense
         FROM transactions
         WHERE user_id = ?
-        AND transaction_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
-        AND transaction_date < DATE_ADD(LAST_DAY(CURDATE()), INTERVAL 1 DAY)
         GROUP BY DATE(transaction_date)
         ORDER BY day
     ");
