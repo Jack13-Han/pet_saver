@@ -446,6 +446,10 @@ if ($path === 'targets' && $method === 'POST') {
     $categoryLength = function_exists('mb_strlen') ? mb_strlen($category) : strlen($category);
     if (empty($name) || $targetAmount <= 0) errorResponse('Name and target amount required');
     if ($category === '' || $categoryLength > 50) errorResponse('Category must be between 1 and 50 characters');
+    $deadline = $input['deadline'] ?? null;
+    if (empty($deadline)) {
+        $deadline = null;
+    }
     ensureTargetAvatarTypes($pdo);
     ensureAvatarShopItems($pdo);
 
@@ -470,18 +474,27 @@ if ($path === 'targets' && $method === 'POST') {
         }
     }
 
-    // Check if user already has an active goal
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM targets WHERE user_id = ? AND status = 'active'");
-    $stmt->execute([$userId]);
+    $isEmergencyTarget = strcasecmp($category, 'Emergency') === 0 || stripos($name, 'emergency') !== false;
+
+    if ($isEmergencyTarget) {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM targets WHERE user_id = ? AND status = 'active' AND (category = 'Emergency' OR name LIKE '%emergency%')");
+        $stmt->execute([$userId]);
+    } else {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM targets WHERE user_id = ? AND status = 'active' AND category != 'Emergency' AND name NOT LIKE '%emergency%'");
+        $stmt->execute([$userId]);
+    }
     if ($stmt->fetchColumn() > 0) {
-        errorResponse('You can only have one active goal at a time. Please complete or delete your current goal first.', 400);
+        $message = $isEmergencyTarget
+            ? 'You already have an active emergency fund.'
+            : 'You can only have one active goal at a time. Please complete or delete your current goal first.';
+        errorResponse($message, 400);
     }
 
     $pdo->beginTransaction();
 
     try {
         $stmt = $pdo->prepare("INSERT INTO targets (user_id, name, description, target_amount, category, deadline, avatar_type, avatar_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$userId, $name, $input['description'] ?? '', $targetAmount, $category, $input['deadline'] ?? null, $avatarType, trim($input['avatar_name'] ?? 'Mochi')]);
+        $stmt->execute([$userId, $name, $input['description'] ?? '', $targetAmount, $category, $deadline, $avatarType, trim($input['avatar_name'] ?? 'Mochi')]);
 
         $targetId = $pdo->lastInsertId();
         // Check if user already has an active goal
@@ -500,7 +513,7 @@ if ($path === 'targets' && $method === 'POST') {
 
         $user = $stmt->fetch();
 
-        if (empty($user['active_target_id'])) {
+        if (!$isEmergencyTarget && empty($user['active_target_id'])) {
 
             $stmt = $pdo->prepare("
     
@@ -526,22 +539,24 @@ if ($path === 'targets' && $method === 'POST') {
 
         $pdo->prepare("INSERT INTO avatars (target_id) VALUES (?)")->execute([$targetId]);
 
-        // ROLLOVER LOGIC: Move excess savings from previous targets to this new target
-        $stmt = $pdo->prepare("SELECT id, current_amount, target_amount FROM targets WHERE user_id = ? AND current_amount > target_amount AND id != ?");
-        $stmt->execute([$userId, $targetId]);
-        $excessTargets = $stmt->fetchAll();
-
         $totalExcess = 0;
-        foreach ($excessTargets as $et) {
-            $excess = $et['current_amount'] - $et['target_amount'];
-            $totalExcess += $excess;
-            // Cap the old target to its target_amount
-            $pdo->prepare("UPDATE targets SET current_amount = target_amount WHERE id = ?")->execute([$et['id']]);
-            // Record a withdrawal for the deduction to balance ledger
-            $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, 'withdrawal', 'Rollover to new goal', NOW())")->execute([$et['id'], $userId, $excess]);
+        if (!$isEmergencyTarget) {
+            // ROLLOVER LOGIC: Move excess savings from previous targets to this new target
+            $stmt = $pdo->prepare("SELECT id, current_amount, target_amount FROM targets WHERE user_id = ? AND current_amount > target_amount AND id != ?");
+            $stmt->execute([$userId, $targetId]);
+            $excessTargets = $stmt->fetchAll();
+
+            foreach ($excessTargets as $et) {
+                $excess = $et['current_amount'] - $et['target_amount'];
+                $totalExcess += $excess;
+                // Cap the old target to its target_amount
+                $pdo->prepare("UPDATE targets SET current_amount = target_amount WHERE id = ?")->execute([$et['id']]);
+                // Record a withdrawal for the deduction to balance ledger
+                $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, 'withdrawal', 'Rollover to new goal', NOW())")->execute([$et['id'], $userId, $excess]);
+            }
         }
 
-        if ($totalExcess > 0) {
+        if (!$isEmergencyTarget && $totalExcess > 0) {
             // Apply excess to the new target
             $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, 'deposit', 'Rollover from previous goal', NOW())")->execute([$targetId, $userId, $totalExcess]);
             
@@ -567,7 +582,8 @@ if ($path === 'targets' && $method === 'POST') {
             $pdo->rollBack();
         }
 
-        errorResponse('Failed to create target', 500);
+        error_log('Failed to create target: ' . $e->getMessage());
+        errorResponse('Failed to create target: ' . $e->getMessage(), 500);
     }
 }
 
@@ -671,14 +687,16 @@ if ($path === 'transactions' && $method === 'POST') {
                 $newAmount = max(0, $target['current_amount'] - $amount);
             }
 
+            $isEmergencyTransactionTarget = isEmergencyTarget($target);
+            $amountScopeSql = $isEmergencyTransactionTarget ? 'user_id = ? AND target_id = ?' : 'user_id = ?';
             $stmt = $pdo->prepare("
                 SELECT
                     COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) -
                     COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0)
                 FROM transactions
-                WHERE target_id = ? AND user_id = ?
+                WHERE $amountScopeSql
             ");
-            $stmt->execute([$targetId, $userId]);
+            $stmt->execute($isEmergencyTransactionTarget ? [$userId, $targetId] : [$userId]);
             $newAmount = max(0, (float)$stmt->fetchColumn());
 
             $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
@@ -1102,91 +1120,6 @@ if ($path === 'missions/claim' && $method === 'POST') {
 }
 
 // HELPERS
-function avatarUnlockNames()
-{
-    return array_map(fn($unlock) => $unlock['name'], AVATAR_UNLOCKS);
-}
-
-function avatarUnlockNameForType($avatarType)
-{
-    foreach (AVATAR_UNLOCKS as $unlock) {
-        if ($unlock['type'] === $avatarType) {
-            return $unlock['name'];
-        }
-    }
-
-    return null;
-}
-
-function avatarUnlockTypeForName($name)
-{
-    foreach (AVATAR_UNLOCKS as $unlock) {
-        if ($unlock['name'] === $name) {
-            return $unlock['type'];
-        }
-    }
-
-    return null;
-}
-
-function ensureTargetAvatarTypes($pdo)
-{
-    try {
-        $column = $pdo->query("SHOW COLUMNS FROM targets LIKE 'avatar_type'")->fetch();
-        if ($column && strpos($column['Type'], "'lufy'") === false) {
-            $pdo->exec("ALTER TABLE targets MODIFY avatar_type ENUM('dog','cat','tree','bird','rabbit','pig','naruto','pikachu','chiikawa','lufy') DEFAULT 'dog'");
-        }
-    } catch (Throwable $e) {
-        // Older local databases may already be compatible or lack DDL permissions.
-    }
-}
-
-function ensureAccessoryAvatarCategory($pdo)
-{
-    try {
-        $column = $pdo->query("SHOW COLUMNS FROM accessories LIKE 'category'")->fetch();
-        if ($column && strpos($column['Type'], "'avatar'") === false) {
-            $pdo->exec("ALTER TABLE accessories MODIFY category ENUM('hat','glasses','scarf','collar','toy','background','avatar') DEFAULT 'hat'");
-        }
-    } catch (Throwable $e) {
-        // Fallback category below keeps the shop working without DDL permissions.
-    }
-}
-
-function getAvatarAccessoryCategory($pdo)
-{
-    try {
-        $column = $pdo->query("SHOW COLUMNS FROM accessories LIKE 'category'")->fetch();
-        if ($column && strpos($column['Type'], "'avatar'") !== false) {
-            return 'avatar';
-        }
-    } catch (Throwable $e) {
-        return 'toy';
-    }
-
-    return 'toy';
-}
-
-function ensureAvatarShopItems($pdo)
-{
-    ensureAccessoryAvatarCategory($pdo);
-    $category = getAvatarAccessoryCategory($pdo);
-
-    foreach (AVATAR_UNLOCKS as $unlock) {
-        $stmt = $pdo->prepare("SELECT id FROM accessories WHERE name = ?");
-        $stmt->execute([$unlock['name']]);
-        $id = $stmt->fetchColumn();
-
-        if ($id) {
-            $stmt = $pdo->prepare("UPDATE accessories SET description = ?, price = ?, icon = ?, category = ? WHERE id = ?");
-            $stmt->execute([$unlock['description'], $unlock['price'], $unlock['icon'], $category, $id]);
-        } else {
-            $stmt = $pdo->prepare("INSERT INTO accessories (name, description, price, icon, category, effect_happiness, effect_energy) VALUES (?, ?, ?, ?, ?, 0, 0)");
-            $stmt->execute([$unlock['name'], $unlock['description'], $unlock['price'], $unlock['icon'], $category]);
-        }
-    }
-}
-
 function scanReceiptWithGemini($image, $mimeType)
 {
     $apiKey = getenv('GEMINI_API_KEY') ?: ($_ENV['GEMINI_API_KEY'] ?? '');
@@ -1372,6 +1305,91 @@ function ensureFinanceFeatureTables($pdo)
     ");
 }
 
+function avatarUnlockNames()
+{
+    return array_map(fn($unlock) => $unlock['name'], AVATAR_UNLOCKS);
+}
+
+function avatarUnlockNameForType($avatarType)
+{
+    foreach (AVATAR_UNLOCKS as $unlock) {
+        if ($unlock['type'] === $avatarType) {
+            return $unlock['name'];
+        }
+    }
+
+    return null;
+}
+
+function avatarUnlockTypeForName($name)
+{
+    foreach (AVATAR_UNLOCKS as $unlock) {
+        if ($unlock['name'] === $name) {
+            return $unlock['type'];
+        }
+    }
+
+    return null;
+}
+
+function ensureTargetAvatarTypes($pdo)
+{
+    try {
+        $column = $pdo->query("SHOW COLUMNS FROM targets LIKE 'avatar_type'")->fetch();
+        if ($column && strpos($column['Type'], "'lufy'") === false) {
+            $pdo->exec("ALTER TABLE targets MODIFY avatar_type ENUM('dog','cat','tree','bird','rabbit','pig','naruto','pikachu','chiikawa','lufy') DEFAULT 'dog'");
+        }
+    } catch (Throwable $e) {
+        // Older local databases may already be compatible or lack DDL permissions.
+    }
+}
+
+function ensureAccessoryAvatarCategory($pdo)
+{
+    try {
+        $column = $pdo->query("SHOW COLUMNS FROM accessories LIKE 'category'")->fetch();
+        if ($column && strpos($column['Type'], "'avatar'") === false) {
+            $pdo->exec("ALTER TABLE accessories MODIFY category ENUM('hat','glasses','scarf','collar','toy','background','avatar') DEFAULT 'hat'");
+        }
+    } catch (Throwable $e) {
+        // Fallback category below keeps the shop working without DDL permissions.
+    }
+}
+
+function getAvatarAccessoryCategory($pdo)
+{
+    try {
+        $column = $pdo->query("SHOW COLUMNS FROM accessories LIKE 'category'")->fetch();
+        if ($column && strpos($column['Type'], "'avatar'") !== false) {
+            return 'avatar';
+        }
+    } catch (Throwable $e) {
+        return 'toy';
+    }
+
+    return 'toy';
+}
+
+function ensureAvatarShopItems($pdo)
+{
+    ensureAccessoryAvatarCategory($pdo);
+    $category = getAvatarAccessoryCategory($pdo);
+
+    foreach (AVATAR_UNLOCKS as $unlock) {
+        $stmt = $pdo->prepare("SELECT id FROM accessories WHERE name = ?");
+        $stmt->execute([$unlock['name']]);
+        $id = $stmt->fetchColumn();
+
+        if ($id) {
+            $stmt = $pdo->prepare("UPDATE accessories SET description = ?, price = ?, icon = ?, category = ? WHERE id = ?");
+            $stmt->execute([$unlock['description'], $unlock['price'], $unlock['icon'], $category, $id]);
+        } else {
+            $stmt = $pdo->prepare("INSERT INTO accessories (name, description, price, icon, category, effect_happiness, effect_energy) VALUES (?, ?, ?, ?, ?, 0, 0)");
+            $stmt->execute([$unlock['name'], $unlock['description'], $unlock['price'], $unlock['icon'], $category]);
+        }
+    }
+}
+
 function ensureUserPrivacyColumns($pdo)
 {
     try {
@@ -1386,35 +1404,6 @@ function ensureUserPrivacyColumns($pdo)
             $pdo->exec("ALTER TABLE users ADD COLUMN show_on_leaderboard TINYINT(1) NOT NULL DEFAULT 1");
         } catch (PDOException $ignored) {
         }
-    }
-}
-
-function normalizeShopItems($items, $owned = [])
-{
-    $ownedIds = array_map('intval', $owned);
-
-    foreach ($items as &$item) {
-        $avatarType = avatarUnlockTypeForName($item['name'] ?? '');
-        if ($avatarType) {
-            $item['category'] = 'avatar';
-            $item['avatar_type'] = $avatarType;
-            $item['icon'] = $avatarType;
-        }
-        $item['owned'] = in_array((int)$item['id'], $ownedIds, true);
-    }
-
-    return $items;
-}
-
-function ensureCareActivityType($pdo)
-{
-    try {
-        $column = $pdo->query("SHOW COLUMNS FROM activity_log LIKE 'activity_type'")->fetch();
-        if ($column && strpos($column['Type'], "'care'") === false) {
-            $pdo->exec("ALTER TABLE activity_log MODIFY activity_type ENUM('save','receipt_scan','purchase','goal_complete','login','care') NOT NULL");
-        }
-    } catch (Throwable $e) {
-        // Existing compatible databases need no migration.
     }
 }
 
@@ -1618,6 +1607,11 @@ function getFinanceOverview($pdo, $userId)
     ");
     $stmt->execute([$userId]);
     $emergency = $stmt->fetch();
+    if ($emergency) {
+        $emergency['progress'] = $emergency['target_amount'] > 0
+            ? round(($emergency['current_amount'] / $emergency['target_amount']) * 100, 1)
+            : 0;
+    }
 
     $stmt = $pdo->prepare("SELECT active_target_id FROM users WHERE id = ?");
     $stmt->execute([$userId]);
@@ -1734,6 +1728,41 @@ function budgetsAreHealthy($budgetSummary)
     return true;
 }
 
+function isEmergencyTarget($target)
+{
+    return strcasecmp($target['category'] ?? '', 'Emergency') === 0
+        || stripos($target['name'] ?? '', 'emergency') !== false;
+}
+
+
+function normalizeShopItems($items, $owned = [])
+{
+    $ownedIds = array_map('intval', $owned);
+
+    foreach ($items as &$item) {
+        $avatarType = avatarUnlockTypeForName($item['name'] ?? '');
+        if ($avatarType) {
+            $item['category'] = 'avatar';
+            $item['avatar_type'] = $avatarType;
+            $item['icon'] = $avatarType;
+        }
+        $item['owned'] = in_array((int)$item['id'], $ownedIds, true);
+    }
+
+    return $items;
+}
+
+function ensureCareActivityType($pdo)
+{
+    try {
+        $column = $pdo->query("SHOW COLUMNS FROM activity_log LIKE 'activity_type'")->fetch();
+        if ($column && strpos($column['Type'], "'care'") === false) {
+            $pdo->exec("ALTER TABLE activity_log MODIFY activity_type ENUM('save','receipt_scan','purchase','goal_complete','login','care') NOT NULL");
+        }
+    } catch (Throwable $e) {
+        // Existing compatible databases need no migration.
+    }
+}
 function checkAchievements($pdo, $userId)
 {
 

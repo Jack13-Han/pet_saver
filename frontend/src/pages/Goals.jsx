@@ -90,6 +90,11 @@ export default function Goals() {
     return Boolean(avatarShopMap[type.id]?.owned)
   }
 
+  const regularGoals = goals.filter(goal => (
+    goal.category !== 'Emergency' &&
+    !String(goal.name || '').toLowerCase().includes('emergency')
+  ))
+
   const confirmDelete = async () => {
     if (!deleteTarget) return
     try {
@@ -111,7 +116,7 @@ export default function Goals() {
           <h2>My Goals 🎯</h2>
           <p>Set targets and watch your pet grow!</p>
         </div>
-        {activeGoals.length === 0 ? (
+        {regularGoals.length === 0 ? (
           <button className="btn btn-primary" onClick={() => setShowModal(true)}>
             <Plus size={18} /> New Goal
           </button>
