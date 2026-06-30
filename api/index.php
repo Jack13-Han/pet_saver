@@ -859,10 +859,7 @@ if ($path === 'avatars/care' && $method === 'POST') {
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE user_id = ? AND activity_type = 'care' AND activity_date = CURDATE()");
         $stmt->execute([$userId]);
         $careActionsToday = (int)$stmt->fetchColumn();
-        if ($careActionsToday >= CARE_DAILY_LIMIT) {
-            $pdo->rollBack();
-            errorResponse('You can take care of your avatar only 3 times per day.', 429);
-        }
+        $rewarded = $careActionsToday < CARE_DAILY_LIMIT;
 
         $stmt = $pdo->prepare("SELECT a.* FROM avatars a JOIN targets t ON a.target_id = t.id WHERE a.target_id = ? AND t.user_id = ?");
         $stmt->execute([$targetId, $userId]);
@@ -892,8 +889,9 @@ if ($path === 'avatars/care' && $method === 'POST') {
                 break;
         }
 
+        $expGain = $rewarded ? 10 : 0;
         $newLevel = max(1, (int)$avatar['level']);
-        $newExp = (int)$avatar['exp'] + 10;
+        $newExp = (int)$avatar['exp'] + $expGain;
         while ($newExp >= $newLevel * 100) {
             $newExp -= $newLevel * 100;
             $newLevel++;
@@ -909,18 +907,22 @@ if ($path === 'avatars/care' && $method === 'POST') {
                 $newLevel,
                 $targetId,
             ]);
-        $pdo->prepare("INSERT INTO activity_log (user_id, activity_type, points, activity_date) VALUES (?, 'care', 10, CURDATE())")
-            ->execute([$userId]);
+        if ($rewarded) {
+            $pdo->prepare("INSERT INTO activity_log (user_id, activity_type, points, activity_date) VALUES (?, 'care', 10, CURDATE())")
+                ->execute([$userId]);
+            $careActionsToday++;
+        }
         $pdo->commit();
 
-        $careActionsToday++;
         successResponse([
             'level' => $newLevel,
             'exp' => $newExp,
+            'exp_gain' => $expGain,
+            'rewarded' => $rewarded,
             'stats' => $updates,
             'care_actions_today' => $careActionsToday,
             'care_actions_remaining' => max(0, CARE_DAILY_LIMIT - $careActionsToday),
-        ], 'Avatar cared for!');
+        ], $rewarded ? 'Avatar cared for and earned EXP!' : 'Avatar cared for! Daily EXP limit already reached.');
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         errorResponse('Failed to care for avatar', 500);

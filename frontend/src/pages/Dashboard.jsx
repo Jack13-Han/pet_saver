@@ -20,6 +20,9 @@ import {
   MessageCircle,
   Gift,
   CheckCircle2,
+  BookOpen,
+  X,
+  ArrowRight,
 } from "lucide-react";
 import {
   dashboard as dashboardApi,
@@ -64,6 +67,60 @@ const careActions = [
   { id: "shower", icon: "🚿", title: "Shower", effect: "+5 Happiness" },
 ];
 
+const tutorialContent = {
+  ja: {
+    button: "使い方",
+    title: "Pet Saver の使い方",
+    subtitle: "5つのステップで、ペットと一緒に貯金を始めましょう。",
+    back: "戻る",
+    next: "次へ",
+    done: "完了",
+    open: "この機能を開く",
+    step: "ステップ",
+    steps: [
+      { icon: "🎯", title: "貯金目標を作る", body: "「目標」ページで目標金額、期限、育てたいペットを設定します。最初にここを設定すると、ホームにペットが表示されます。", path: "/goals", action: "目標を開く" },
+      { icon: "💰", title: "毎日貯金する", body: "ホームの＋ボタンから貯金額を入力します。貯金すると目標の進捗、ペットのEXP、幸福度が上がります。", path: "/", action: "ホームで貯金する" },
+      { icon: "📸", title: "レシートを記録する", body: "「レシートスキャナー」で写真を読み取ると、店名、金額、日付を自動入力して支出履歴に保存できます。", path: "/scanner", action: "スキャナーを開く" },
+      { icon: "📊", title: "支出を分析する", body: "「支出分析」ではカテゴリ別の支出を確認できます。「AIアドバイス」では実際の履歴から節約方法を提案します。", path: "/expense-analyst", action: "支出分析を開く" },
+      { icon: "🐾", title: "ペットと習慣を続ける", body: "デイリーミッション、ペットのお世話、マネープランナーを使って毎日の習慣を続けましょう。達成するとコインやEXPを獲得できます。", path: "/planner", action: "プランナーを開く" },
+    ],
+  },
+  my: {
+    button: "သုံးနည်း",
+    title: "Pet Saver သုံးနည်း",
+    subtitle: "Pet နဲ့အတူ ငွေစတင်စုဖို့ အဆင့် ၅ ဆင့်ကိုလိုက်လုပ်ပါ။",
+    back: "နောက်သို့",
+    next: "ရှေ့သို့",
+    done: "ပြီးပါပြီ",
+    open: "ဒီ Function ကိုဖွင့်မယ်",
+    step: "အဆင့်",
+    steps: [
+      { icon: "🎯", title: "Saving Goal ဖန်တီးပါ", body: "Goals page မှာ စုချင်တဲ့ပမာဏ၊ deadline နဲ့ မွေးချင်တဲ့ pet ကိုရွေးပါ။ Goal ရှိမှ Home မှာ pet ပေါ်လာမယ်။", path: "/goals", action: "Goals ကိုဖွင့်မယ်" },
+      { icon: "💰", title: "နေ့စဉ် ငွေစုပါ", body: "Home က + button ကိုနှိပ်ပြီး saving amount ထည့်ပါ။ ငွေစုတိုင်း Goal progress၊ Pet EXP နဲ့ Happiness တက်မယ်။", path: "/", action: "Home မှာစုမယ်" },
+      { icon: "📸", title: "Receipt ကိုမှတ်တမ်းတင်ပါ", body: "Receipt Scanner မှာ ဘောင်ချာဓာတ်ပုံတင်ရင် ဆိုင်နာမည်၊ ပမာဏနဲ့ ရက်စွဲကိုဖတ်ပြီး expense history ထဲသိမ်းပေးမယ်။", path: "/scanner", action: "Scanner ကိုဖွင့်မယ်" },
+      { icon: "📊", title: "အသုံးစရိတ်ကို Analysis လုပ်ပါ", body: "Expense pages မှာ category အလိုက်အသုံးစရိတ်ကြည့်နိုင်ပြီး Expense Analyst က history အပေါ်မူတည်ပြီး saving advice ပေးမယ်။", path: "/expense-analyst", action: "Analyst ကိုဖွင့်မယ်" },
+      { icon: "🐾", title: "Pet နဲ့ habit ဆက်လုပ်ပါ", body: "Daily Quests၊ Pet Care နဲ့ Planner ကိုသုံးပြီး habit တည်ဆောက်ပါ။ ပြီးမြောက်ရင် Coins နဲ့ Pet EXP ရမယ်။", path: "/planner", action: "Planner ကိုဖွင့်မယ်" },
+    ],
+  },
+  en: {
+    button: "App Guide",
+    title: "How to use Pet Saver",
+    subtitle: "Follow five simple steps to save money with your pet.",
+    back: "Back",
+    next: "Next",
+    done: "Done",
+    open: "Open this feature",
+    step: "Step",
+    steps: [
+      { icon: "🎯", title: "Create a savings goal", body: "Open Goals and choose an amount, deadline, and pet. Your pet appears on Home after you create a goal.", path: "/goals", action: "Open Goals" },
+      { icon: "💰", title: "Save money every day", body: "Use the + button on Home to record savings. Every deposit grows your goal progress, pet EXP, and happiness.", path: "/", action: "Save on Home" },
+      { icon: "📸", title: "Record receipts", body: "Upload a receipt in Receipt Scanner to detect the store, total, and date, then save it to expense history.", path: "/scanner", action: "Open Scanner" },
+      { icon: "📊", title: "Understand your spending", body: "Review spending by category and open Expense Analyst for advice based on your real expense history.", path: "/expense-analyst", action: "Open Analyst" },
+      { icon: "🐾", title: "Build the habit with your pet", body: "Complete Daily Quests, care for your pet, and use Planner. Consistent actions earn coins and pet EXP.", path: "/planner", action: "Open Planner" },
+    ],
+  },
+};
+
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [calendarData, setCalendarData] = useState([]);
@@ -71,6 +128,9 @@ export default function Dashboard() {
   const [toast, setToast] = useState(null);
   const [petReaction, setPetReaction] = useState(null);
   const [conversationIndex, setConversationIndex] = useState(0);
+  const [caringAction, setCaringAction] = useState(null);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
   const [animatingPet, setAnimatingPet] = useState(false);
   const [petPointer, setPetPointer] = useState({ x: 0, y: 0 });
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -84,6 +144,18 @@ export default function Dashboard() {
   const { user, updateUser } = useAuth();
   const { language } = useLanguage();
   const navigate = useNavigate();
+  const tutorial = tutorialContent[language] || tutorialContent.en;
+  const activeTutorialStep = tutorial.steps[tutorialStep];
+
+  const openTutorial = () => {
+    setTutorialStep(0);
+    setShowTutorial(true);
+  };
+
+  const openTutorialFeature = () => {
+    setShowTutorial(false);
+    navigate(activeTutorialStep.path);
+  };
 
   const handleReceiptUpload = async (e) => {
     const file = e.target.files[0];
@@ -125,7 +197,6 @@ export default function Dashboard() {
   const showDeadlineWarning =
     target && !showExpiredGoal && target.deadline && progress < 100 && daysUntilDeadline !== null && daysUntilDeadline >= 0 && daysUntilDeadline <= 3;
   const careActionsRemaining = target?.care_actions_remaining ?? 3;
-  const careLimitReached = careActionsRemaining <= 0;
   const todayKey = new Date().toISOString().split("T")[0];
   const savedToday = (data?.transactions || []).some((tx) => (
     tx.type === "deposit" &&
@@ -353,11 +424,8 @@ export default function Dashboard() {
   };
 
   const handleCare = async (action) => {
-    if (!data?.activeTarget) return;
-    if (careLimitReached) {
-      showToast("You can take care of your avatar only 3 times per day.", "error");
-      return;
-    }
+    if (!data?.activeTarget || caringAction) return;
+    setCaringAction(action.id);
     try {
       const res = await avatarApi.care({
         target_id: data.activeTarget.id,
@@ -366,10 +434,14 @@ export default function Dashboard() {
       showPetReaction({
         emoji: action.icon,
         message: `${data.activeTarget.avatar_name} enjoyed ${action.title.toLowerCase()} time!`,
-        exp_gain: 10,
+        exp_gain: Number(res.data?.exp_gain || 0),
         happiness_gain: action.id === "play" ? 10 : action.id === "shower" ? 5 : 0,
       });
-      showToast(`${action.title} completed! ✨`);
+      showToast(
+        res.data?.rewarded
+          ? `${action.title} completed! +${res.data.exp_gain} EXP ✨`
+          : `${action.title} completed! Daily EXP limit is already reached.`,
+      );
       setData((prev) => ({
         ...prev,
         activeTarget: {
@@ -384,6 +456,8 @@ export default function Dashboard() {
       loadDashboard();
     } catch (err) {
       showToast(err.message || "Care action failed", "error");
+    } finally {
+      setCaringAction(null);
     }
   };
   const handleClaimDailyQuest = async (questId) => {
@@ -472,6 +546,83 @@ export default function Dashboard() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {showTutorial && (
+          <motion.div
+            className="tutorial-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowTutorial(false)}
+          >
+            <motion.div
+              className="tutorial-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="tutorial-title"
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.96 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="tutorial-header">
+                <div className="tutorial-heading-icon"><BookOpen size={23} /></div>
+                <div>
+                  <h3 id="tutorial-title">{tutorial.title}</h3>
+                  <p>{tutorial.subtitle}</p>
+                </div>
+                <button type="button" className="tutorial-close" onClick={() => setShowTutorial(false)} aria-label="Close tutorial">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="tutorial-progress" aria-label={`${tutorial.step} ${tutorialStep + 1}`}>
+                {tutorial.steps.map((_, index) => (
+                  <span key={index} className={index <= tutorialStep ? "active" : ""} />
+                ))}
+              </div>
+
+              <motion.div
+                className="tutorial-step-card"
+                key={`${language}-${tutorialStep}`}
+                initial={{ opacity: 0, x: 18 }}
+                animate={{ opacity: 1, x: 0 }}
+              >
+                <div className="tutorial-step-number">{tutorial.step} {tutorialStep + 1} / {tutorial.steps.length}</div>
+                <div className="tutorial-step-icon">{activeTutorialStep.icon}</div>
+                <h4>{activeTutorialStep.title}</h4>
+                <p>{activeTutorialStep.body}</p>
+                <button type="button" className="tutorial-open-feature" onClick={openTutorialFeature}>
+                  {activeTutorialStep.action || tutorial.open} <ArrowRight size={16} />
+                </button>
+              </motion.div>
+
+              <div className="tutorial-actions">
+                <button
+                  type="button"
+                  className="tutorial-back"
+                  onClick={() => setTutorialStep((step) => Math.max(0, step - 1))}
+                  disabled={tutorialStep === 0}
+                >
+                  <ChevronLeft size={17} /> {tutorial.back}
+                </button>
+                <button
+                  type="button"
+                  className="tutorial-next"
+                  onClick={() => {
+                    if (tutorialStep === tutorial.steps.length - 1) setShowTutorial(false);
+                    else setTutorialStep((step) => step + 1);
+                  }}
+                >
+                  {tutorialStep === tutorial.steps.length - 1 ? tutorial.done : tutorial.next}
+                  {tutorialStep < tutorial.steps.length - 1 && <ArrowRight size={17} />}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showExpiredGoal && (
           <motion.div
             className="modal-overlay"
@@ -536,6 +687,10 @@ export default function Dashboard() {
             <Flame size={20} />
             <span>{data?.user?.streak_days || 0} Day Streak</span>
           </div>
+          <button type="button" className="tutorial-trigger" onClick={openTutorial}>
+            <BookOpen size={18} />
+            <span>{tutorial.button}</span>
+          </button>
         </div>
       </div>
 
@@ -735,7 +890,7 @@ export default function Dashboard() {
                     <strong>Bond with {target.avatar_name}</strong>
                     <span>Care turns money progress into a daily relationship.</span>
                   </div>
-                  <span className="care-count">{careActionsRemaining}/3 left</span>
+                  <span className="care-count">{careActionsRemaining}/3 EXP rewards left</span>
                 </div>
 
                 <div className="care-grid">
@@ -745,11 +900,15 @@ export default function Dashboard() {
                       className="care-btn"
                       key={action.id}
                       onClick={() => handleCare(action)}
-                      disabled={careLimitReached}
+                      disabled={caringAction !== null}
                     >
                       <span className="care-btn-icon">{action.icon}</span>
-                      <span className="care-btn-title">{action.title}</span>
-                      <span className="care-btn-effect">{action.effect}</span>
+                      <span className="care-btn-title">
+                        {caringAction === action.id ? "Treating..." : action.title}
+                      </span>
+                      <span className="care-btn-effect">
+                        {careActionsRemaining > 0 ? action.effect : "Care only · EXP maxed"}
+                      </span>
                     </button>
                   ))}
                 </div>
