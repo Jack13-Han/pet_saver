@@ -252,11 +252,17 @@ export default function Dashboard() {
     boxShadow: "0 28px 70px rgba(0, 0, 0, 0.15)",
   };
 
-  const calendarMonths = useMemo(() => {
+  const selectedCalendarMonth = useMemo(() => {
+    const parts = calendarMonthKey.split("-");
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+
     const now = new Date();
     const todayKey = formatDateKey(now);
-    const currentMonth = startOfMonth(now);
-    const nextMonth = addMonths(currentMonth, 1);
+    const monthDate = new Date(year, month, 1);
+    const firstDay = new Date(year, month, 1);
+    const totalDays = new Date(year, month + 1, 0).getDate();
+
     const totalsByDay = new Map(
       calendarData.map((item) => [
         item.day,
@@ -266,74 +272,52 @@ export default function Dashboard() {
         },
       ]),
     );
-    const datesWithEntries = calendarData
-      .map((item) => new Date(`${item.day}T00:00:00`))
-      .filter((date) => !Number.isNaN(date.getTime()));
-    const earliestMonthFromData = datesWithEntries.length
-      ? startOfMonth(new Date(Math.min(...datesWithEntries.map((date) => date.getTime()))))
-      : currentMonth;
-    const earliestMonth = earliestMonthFromData < currentMonth ? earliestMonthFromData : currentMonth;
-    const latestMonthFromData = datesWithEntries.length
-      ? startOfMonth(new Date(Math.max(...datesWithEntries.map((date) => date.getTime()))))
-      : currentMonth;
-    const lastMonth = latestMonthFromData > nextMonth ? latestMonthFromData : nextMonth;
 
-    const months = [];
-    for (
-      let monthDate = earliestMonth;
-      monthDate <= lastMonth;
-      monthDate = addMonths(monthDate, 1)
-    ) {
-      const year = monthDate.getFullYear();
-      const month = monthDate.getMonth();
-      const firstDay = new Date(year, month, 1);
-      const totalDays = new Date(year, month + 1, 0).getDate();
+    const emptyCells = Array.from({ length: firstDay.getDay() }, (_, index) => ({
+      key: `${formatDateKey(firstDay)}-empty-${index}`,
+      isEmpty: true,
+    }));
 
-      const emptyCells = Array.from({ length: firstDay.getDay() }, (_, index) => ({
-        key: `${formatDateKey(firstDay)}-empty-${index}`,
-        isEmpty: true,
-      }));
+    const dayCells = Array.from({ length: totalDays }, (_, index) => {
+      const dayNumber = index + 1;
+      const key = formatDateKey(new Date(year, month, dayNumber));
+      const totals = totalsByDay.get(key) || { income: 0, expense: 0 };
 
-      const dayCells = Array.from({ length: totalDays }, (_, index) => {
-        const dayNumber = index + 1;
-        const key = formatDateKey(new Date(year, month, dayNumber));
-        const totals = totalsByDay.get(key) || { income: 0, expense: 0 };
+      return {
+        key,
+        dayNumber,
+        income: totals.income,
+        expense: totals.expense,
+        isToday: key === todayKey,
+      };
+    });
 
-        return {
-          key,
-          dayNumber,
-          income: totals.income,
-          expense: totals.expense,
-          isToday: key === todayKey,
-        };
-      });
+    return {
+      key: calendarMonthKey,
+      label: monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      cells: [...emptyCells, ...dayCells],
+    };
+  }, [calendarMonthKey, calendarData]);
 
-      months.push({
-        key: formatMonthKey(monthDate),
-        label: monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
-        cells: [...emptyCells, ...dayCells],
-      });
-    }
-
-    return months;
-  }, [calendarData]);
-
-  const selectedCalendarMonthIndex = Math.max(
-    0,
-    calendarMonths.findIndex((month) => month.key === calendarMonthKey),
-  );
-  const selectedCalendarMonth = calendarMonths[selectedCalendarMonthIndex] || calendarMonths[0];
-  const canGoPreviousMonth = selectedCalendarMonthIndex > 0;
-  const canGoNextMonth = selectedCalendarMonthIndex < calendarMonths.length - 1;
+  const canGoPreviousMonth = true;
+  const canGoNextMonth = true;
 
   const handleCalendarMonthChange = (direction) => {
-    if (!calendarMonths.length) return;
+    const parts = calendarMonthKey.split("-");
+    let year = parseInt(parts[0], 10);
+    let month = parseInt(parts[1], 10) - 1;
 
-    const nextIndex = Math.min(
-      calendarMonths.length - 1,
-      Math.max(0, selectedCalendarMonthIndex + direction),
-    );
-    setCalendarMonthKey(calendarMonths[nextIndex].key);
+    month += direction;
+    if (month < 0) {
+      month = 11;
+      year -= 1;
+    } else if (month > 11) {
+      month = 0;
+      year += 1;
+    }
+
+    const nextMonthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
+    setCalendarMonthKey(nextMonthStr);
   };
 
   const selectedCalendarDayDetails = useMemo(() => {
