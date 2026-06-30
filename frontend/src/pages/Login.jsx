@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext.jsx'
 import Lottie from "lottie-react"
 import petAnimation from "../assets/lottie/pet.json"
+import { User, Mail, KeyRound } from 'lucide-react'
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true)
@@ -30,7 +31,12 @@ export default function Login() {
 
   return (
     <div className="login-container">
-      <motion.div className="login-card" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.5 }}>
+      <motion.div 
+        className="login-card" 
+        initial={{ scale: 0.95, opacity: 0, y: 15 }} 
+        animate={{ scale: 1, opacity: 1, y: 0 }} 
+        transition={{ duration: 0.4 }}
+      >
         <div className="login-brand">
           <div className="login-brand-icon">
             <Lottie
@@ -47,35 +53,99 @@ export default function Login() {
         </div>
 
         <AnimatePresence mode="wait">
-          <motion.form key={isLogin ? 'login' : 'register'} className="login-form" initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} onSubmit={handleSubmit}>
-            <input type="text" className="login-input" placeholder="Username" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} required minLength={3} />
-            {!isLogin && <input type="email" className="login-input" placeholder="Email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />}
-            <input type="password" className="login-input" placeholder="Password (min 6 chars)" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required minLength={6} />
+          <motion.form 
+            key={isLogin ? 'login' : 'register'} 
+            className="login-form" 
+            initial={{ x: 10, opacity: 0 }} 
+            animate={{ x: 0, opacity: 1 }} 
+            exit={{ x: -10, opacity: 0 }} 
+            onSubmit={handleSubmit}
+          >
+            {/* Username Input */}
+            <div className="login-field-wrapper">
+              <User size={18} className="login-field-icon" />
+              <input 
+                type="text" 
+                className="login-input" 
+                placeholder="Username" 
+                value={form.username} 
+                onChange={e => setForm({ ...form, username: e.target.value })} 
+                required 
+                minLength={3} 
+              />
+            </div>
 
+            {/* Email Input (Register only) */}
+            {!isLogin && (
+              <div className="login-field-wrapper">
+                <Mail size={18} className="login-field-icon" />
+                <input 
+                  type="email" 
+                  className="login-input" 
+                  placeholder="Email" 
+                  value={form.email} 
+                  onChange={e => setForm({ ...form, email: e.target.value })} 
+                  required 
+                />
+              </div>
+            )}
+
+            {/* Password Input */}
+            <div className="login-field-wrapper">
+              <KeyRound size={18} className="login-field-icon" />
+              <input 
+                type="password" 
+                className="login-input" 
+                placeholder="Password (min 6 chars)" 
+                value={form.password} 
+                onChange={e => setForm({ ...form, password: e.target.value })} 
+                required 
+                minLength={6} 
+              />
+            </div>
+
+            {/* Error Message */}
             {error && (
-              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} style={{ color: '#EF4444', fontSize: 14, fontWeight: 600, textAlign: 'center', padding: '8px 12px', background: '#FEE2E2', borderRadius: '8px' }}>
+              <motion.div 
+                initial={{ opacity: 0, y: -5 }} 
+                animate={{ opacity: 1, y: 0 }} 
+                style={{ 
+                  color: '#EF4444', 
+                  fontSize: 13, 
+                  fontWeight: 700, 
+                  textAlign: 'center', 
+                  padding: '10px 14px', 
+                  background: '#FEE2E2', 
+                  borderRadius: '12px',
+                  border: '1px solid rgba(239, 68, 68, 0.2)' 
+                }}
+              >
                 ⚠️ {error}
               </motion.div>
             )}
 
-            <button type="submit" className="btn btn-primary" disabled={loading}>
+            {/* Submit Button */}
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="submit" 
+              className="login-submit-btn" 
+              disabled={loading}
+            >
               {loading ? '⏳ Connecting...' : (isLogin ? '🔑 Login' : '📝 Create Account')}
-            </button>
+            </motion.button>
           </motion.form>
         </AnimatePresence>
 
         <div className="login-toggle">
           {isLogin ? "Don't have an account? " : "Already have an account? "}
-          <button onClick={() => { setIsLogin(!isLogin); setError('') }}>{isLogin ? 'Sign Up' : 'Login'}</button>
-        </div>
-
-        <div style={{ marginTop: 20, padding: '12px', background: '#F3F4F6', borderRadius: '8px', fontSize: 12, color: '#6B7280', textAlign: 'center', lineHeight: 1.6 }}>
-          <strong>Setup Check:</strong><br />
-          1. Import database/schema.sql to MySQL<br />
-          2. Copy api/.env.example → api/.env<br />
-          3. Set DB_PASS in api/.env<br />
-          4. Place api/ in web server (htdocs/)<br />
-          5. Enable mod_rewrite in Apache
+          <button 
+            type="button" 
+            onClick={() => { setIsLogin(!isLogin); setError('') }}
+            style={{ marginLeft: 6 }}
+          >
+            {isLogin ? 'Sign Up' : 'Login'}
+          </button>
         </div>
       </motion.div>
     </div>
