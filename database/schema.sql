@@ -207,6 +207,18 @@ CREATE TABLE
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
     );
 
+CREATE TABLE
+    daily_quest_claims (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        quest_id VARCHAR(50) NOT NULL,
+        quest_date DATE NOT NULL,
+        reward_coins INT NOT NULL DEFAULT 0,
+        claimed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_daily_quest_claim (user_id, quest_id, quest_date),
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    );
+
 -- Default Accessories
 INSERT INTO
     accessories (

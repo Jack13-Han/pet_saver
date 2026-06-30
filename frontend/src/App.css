@@ -721,6 +721,184 @@ body {
   gap: 14px;
 }
 
+.pet-conversation-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(124, 58, 237, 0.16);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #f5f3ff, #ffffff);
+}
+
+.pet-conversation-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #7c3aed;
+  background: #ede9fe;
+}
+
+.pet-conversation-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.pet-conversation-copy span {
+  color: #7c3aed;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pet-conversation-copy p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.pet-talk-again {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 9px;
+  border: 1px solid #ddd6fe;
+  border-radius: var(--radius-full);
+  color: #6d28d9;
+  background: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pet-talk-again:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.daily-quests-card .card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.daily-quest-subtitle {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.daily-quest-total {
+  min-width: 42px;
+  padding: 6px 9px;
+  border-radius: var(--radius-full);
+  color: #047857;
+  background: #d1fae5;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.daily-quest-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.daily-quest-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+}
+
+.daily-quest-item.claimed {
+  border-color: #a7f3d0;
+  background: #f0fdf4;
+}
+
+.daily-quest-icon {
+  font-size: 23px;
+}
+
+.daily-quest-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.daily-quest-copy strong {
+  font-size: 12px;
+}
+
+.daily-quest-copy > span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.daily-quest-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: #e5e7eb;
+}
+
+.daily-quest-progress div {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #34d399, #10b981);
+  transition: width 0.35s ease;
+}
+
+.daily-quest-claim {
+  min-width: 42px;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 10px;
+  color: #ffffff;
+  background: #10b981;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.daily-quest-claim:disabled {
+  color: var(--text-muted);
+  background: #f1f5f9;
+  cursor: default;
+}
+
+.daily-quest-item.claimed .daily-quest-claim:disabled {
+  color: #047857;
+  background: #d1fae5;
+}
+
+@media (max-width: 640px) {
+  .pet-conversation-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .pet-talk-again {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+}
+
 .pet-level-row {
   display: grid;
   grid-template-columns: minmax(150px, auto) 1fr;

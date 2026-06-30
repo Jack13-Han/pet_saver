@@ -46,6 +46,7 @@ set_exception_handler(function($exception) {
 require_once 'config.php';
 
 const MAX_MONEY_AMOUNT = 9999999999999.99;
+const CARE_DAILY_LIMIT = 3;
 const STARTER_AVATAR_TYPES = ['dog', 'cat'];
 const AVATAR_UNLOCKS = [
     [
@@ -329,12 +330,13 @@ if ($path === 'user/active-target' && $method === 'POST') {
 }
 
 if ($path === 'dashboard' && $method === 'GET') {
+    ensureCareActivityType($pdo);
     $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
     $stmt->execute([$userId]);
     $userData = $stmt->fetch();
 
     $stmt = $pdo->prepare("
-    SELECT t.*, a.level, a.exp,
+    SELECT t.*, a.happiness, a.energy, a.fullness, a.cleanliness, a.level, a.exp,
         a.mood, a.accessories
     FROM targets t
     LEFT JOIN avatars a ON t.id = a.target_id
@@ -383,6 +385,11 @@ if ($path === 'dashboard' && $method === 'GET') {
         $activeTarget['mood'] = moodFromProgress($activeTarget['progress']);
         $pdo->prepare("UPDATE avatars SET mood = ? WHERE target_id = ?")->execute([$activeTarget['mood'], $activeTarget['id']]);
         $activeTarget['accessories'] = json_decode($activeTarget['accessories'] ?? '[]', true);
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE user_id = ? AND activity_type = 'care' AND activity_date = CURDATE()");
+        $stmt->execute([$userId]);
+        $careActionsToday = (int)$stmt->fetchColumn();
+        $activeTarget['care_actions_today'] = $careActionsToday;
+        $activeTarget['care_actions_remaining'] = max(0, CARE_DAILY_LIMIT - $careActionsToday);
     }
 
     $stmt = $pdo->prepare("SELECT t.*, tg.name as target_name FROM transactions t LEFT JOIN targets tg ON t.target_id = tg.id WHERE t.user_id = ? ORDER BY t.created_at DESC LIMIT 10");
@@ -400,7 +407,18 @@ if ($path === 'dashboard' && $method === 'GET') {
     $stmt->execute($avatarNames);
     $shopPreview = normalizeShopItems($stmt->fetchAll());
 
-    successResponse(['user' => $userData, 'activeTarget' => $activeTarget, 'transactions' => $transactions, 'achievements' => $achievements, 'shopPreview' => $shopPreview]);
+    $dailyQuests = getDailyMoneyQuests($pdo, $userId);
+    $petConversation = getPetConversation($pdo, $userId, $activeTarget);
+
+    successResponse([
+        'user' => $userData,
+        'activeTarget' => $activeTarget,
+        'transactions' => $transactions,
+        'achievements' => $achievements,
+        'shopPreview' => $shopPreview,
+        'dailyQuests' => $dailyQuests,
+        'petConversation' => $petConversation,
+    ]);
 }
 
 if ($path === 'targets' && $method === 'GET') {
@@ -825,6 +843,90 @@ if ($path === 'calendar' && $method === 'GET') {
     );
 }
 
+if ($path === 'avatars/care' && $method === 'POST') {
+    $targetId = intval($input['target_id'] ?? 0);
+    $action = $input['action'] ?? '';
+    if (!$targetId || !in_array($action, ['play', 'feed', 'rest', 'shower'], true)) {
+        errorResponse('Invalid care action');
+    }
+
+    ensureCareActivityType($pdo);
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE id = ? FOR UPDATE");
+        $stmt->execute([$userId]);
+
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE user_id = ? AND activity_type = 'care' AND activity_date = CURDATE()");
+        $stmt->execute([$userId]);
+        $careActionsToday = (int)$stmt->fetchColumn();
+        if ($careActionsToday >= CARE_DAILY_LIMIT) {
+            $pdo->rollBack();
+            errorResponse('You can take care of your avatar only 3 times per day.', 429);
+        }
+
+        $stmt = $pdo->prepare("SELECT a.* FROM avatars a JOIN targets t ON a.target_id = t.id WHERE a.target_id = ? AND t.user_id = ?");
+        $stmt->execute([$targetId, $userId]);
+        $avatar = $stmt->fetch();
+        if (!$avatar) {
+            $pdo->rollBack();
+            errorResponse('Avatar not found');
+        }
+
+        $updates = [];
+        switch ($action) {
+            case 'play':
+                $updates['happiness'] = min(100, (int)$avatar['happiness'] + 10);
+                $updates['energy'] = max(0, (int)$avatar['energy'] - 5);
+                break;
+            case 'feed':
+                $updates['fullness'] = min(100, (int)$avatar['fullness'] + 10);
+                $updates['energy'] = min(100, (int)$avatar['energy'] + 5);
+                break;
+            case 'rest':
+                $updates['energy'] = min(100, (int)$avatar['energy'] + 10);
+                $updates['happiness'] = max(0, (int)$avatar['happiness'] - 2);
+                break;
+            case 'shower':
+                $updates['cleanliness'] = min(100, (int)$avatar['cleanliness'] + 10);
+                $updates['happiness'] = min(100, (int)$avatar['happiness'] + 5);
+                break;
+        }
+
+        $newLevel = max(1, (int)$avatar['level']);
+        $newExp = (int)$avatar['exp'] + 10;
+        while ($newExp >= $newLevel * 100) {
+            $newExp -= $newLevel * 100;
+            $newLevel++;
+        }
+
+        $pdo->prepare("UPDATE avatars SET happiness = ?, energy = ?, fullness = ?, cleanliness = ?, exp = ?, level = ? WHERE target_id = ?")
+            ->execute([
+                $updates['happiness'] ?? $avatar['happiness'],
+                $updates['energy'] ?? $avatar['energy'],
+                $updates['fullness'] ?? $avatar['fullness'],
+                $updates['cleanliness'] ?? $avatar['cleanliness'],
+                $newExp,
+                $newLevel,
+                $targetId,
+            ]);
+        $pdo->prepare("INSERT INTO activity_log (user_id, activity_type, points, activity_date) VALUES (?, 'care', 10, CURDATE())")
+            ->execute([$userId]);
+        $pdo->commit();
+
+        $careActionsToday++;
+        successResponse([
+            'level' => $newLevel,
+            'exp' => $newExp,
+            'stats' => $updates,
+            'care_actions_today' => $careActionsToday,
+            'care_actions_remaining' => max(0, CARE_DAILY_LIMIT - $careActionsToday),
+        ], 'Avatar cared for!');
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        errorResponse('Failed to care for avatar', 500);
+    }
+}
+
 if ($path === 'shop' && $method === 'GET') {
     ensureAvatarShopItems($pdo);
     $avatarNames = avatarUnlockNames();
@@ -1070,6 +1172,44 @@ if ($path === 'missions/claim' && $method === 'POST') {
     successResponse(['coins' => $reward, 'pet_reaction' => $petReaction], 'Mission reward claimed');
 }
 
+if ($path === 'daily-quests/claim' && $method === 'POST') {
+    $questId = trim($input['quest_id'] ?? '');
+    $quests = getDailyMoneyQuests($pdo, $userId);
+    $quest = null;
+
+    foreach ($quests as $candidate) {
+        if ($candidate['id'] === $questId) {
+            $quest = $candidate;
+            break;
+        }
+    }
+
+    if (!$quest) errorResponse('Daily quest not found', 404);
+    if (!$quest['completed']) errorResponse('Complete this daily quest first');
+    if ($quest['claimed']) errorResponse('Daily quest reward already claimed');
+
+    $today = date('Y-m-d');
+    $reward = (int)$quest['reward'];
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("INSERT INTO daily_quest_claims (user_id, quest_id, quest_date, reward_coins) VALUES (?, ?, ?, ?)")
+            ->execute([$userId, $questId, $today, $reward]);
+        $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")
+            ->execute([$reward, $userId]);
+        $petReaction = rewardPetForMoneyAction($pdo, $userId, null, 'quest', $reward);
+        $pdo->commit();
+
+        successResponse([
+            'coins' => $reward,
+            'pet_reaction' => $petReaction,
+            'quests' => getDailyMoneyQuests($pdo, $userId),
+        ], 'Daily quest reward claimed');
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        errorResponse('Failed to claim daily quest', 500);
+    }
+}
+
 // HELPERS
 function rewardPetForMoneyAction($pdo, $userId, $targetId, $action, $amount = 0, $progress = null)
 {
@@ -1126,6 +1266,12 @@ function rewardPetForMoneyAction($pdo, $userId, $targetId, $action, $amount = 0,
             $happinessGain = 10;
             $emoji = '🏆';
             $message = "$name celebrates your completed money mission!";
+            break;
+        case 'quest':
+            $expGain = 10;
+            $happinessGain = 5;
+            $emoji = '⭐';
+            $message = "$name loved completing today's money quest with you!";
             break;
         case 'expense':
         default:
@@ -1367,6 +1513,142 @@ function ensureFinanceFeatureTables($pdo)
             UNIQUE KEY unique_user_mission (user_id, mission_id)
         )
     ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS daily_quest_claims (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            quest_id VARCHAR(50) NOT NULL,
+            quest_date DATE NOT NULL,
+            reward_coins INT NOT NULL DEFAULT 0,
+            claimed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_daily_quest_claim (user_id, quest_id, quest_date)
+        )
+    ");
+}
+
+function getDailyMoneyQuests($pdo, $userId)
+{
+    $today = date('Y-m-d');
+
+    $stmt = $pdo->prepare("
+        SELECT
+            COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) AS saved_amount,
+            SUM(CASE WHEN type = 'withdrawal' THEN 1 ELSE 0 END) AS expenses
+        FROM transactions
+        WHERE user_id = ? AND transaction_date = ?
+    ");
+    $stmt->execute([$userId, $today]);
+    $moneyProgress = $stmt->fetch() ?: [];
+
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM activity_log WHERE user_id = ? AND activity_type = 'care' AND activity_date = ?");
+    $stmt->execute([$userId, $today]);
+    $careCount = (int)$stmt->fetchColumn();
+
+    $stmt = $pdo->prepare("SELECT quest_id FROM daily_quest_claims WHERE user_id = ? AND quest_date = ?");
+    $stmt->execute([$userId, $today]);
+    $claimed = array_flip(array_column($stmt->fetchAll(), 'quest_id'));
+
+    $quests = [
+        [
+            'id' => 'save_today',
+            'icon' => '💰',
+            'title' => 'Save with your pet',
+            'description' => 'Save a total of ¥1,500 today.',
+            'progress' => min(1500, (int)round((float)($moneyProgress['saved_amount'] ?? 0))),
+            'target' => 1500,
+            'reward' => 15,
+        ],
+        [
+            'id' => 'track_expense',
+            'icon' => '📝',
+            'title' => 'Track money honestly',
+            'description' => 'Record one expense or receipt today.',
+            'progress' => min(1, (int)($moneyProgress['expenses'] ?? 0)),
+            'target' => 1,
+            'reward' => 10,
+        ],
+        [
+            'id' => 'care_pet',
+            'icon' => '🐾',
+            'title' => 'Share a care moment',
+            'description' => 'Play, feed, rest, or shower your pet.',
+            'progress' => min(1, $careCount),
+            'target' => 1,
+            'reward' => 10,
+        ],
+    ];
+
+    foreach ($quests as &$quest) {
+        $quest['completed'] = $quest['progress'] >= $quest['target'];
+        $quest['claimed'] = isset($claimed[$quest['id']]);
+    }
+
+    return $quests;
+}
+
+function getPetConversation($pdo, $userId, $activeTarget)
+{
+    $today = date('Y-m-d');
+    $stmt = $pdo->prepare("
+        SELECT
+            COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) AS saved,
+            COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0) AS spent
+        FROM transactions
+        WHERE user_id = ? AND transaction_date = ?
+    ");
+    $stmt->execute([$userId, $today]);
+    $todayMoney = $stmt->fetch() ?: ['saved' => 0, 'spent' => 0];
+    $saved = (float)$todayMoney['saved'];
+    $spent = (float)$todayMoney['spent'];
+
+    if (!$activeTarget) {
+        return [
+            'tone' => 'hopeful',
+            'summary' => 'Choose a goal and I will grow with every money step.',
+            'messages' => [
+                'Give me a name and a savings goal so we can start our journey.',
+                'A small goal is enough. We can make it bigger together later.',
+                'I am ready whenever you are—let us create our first goal!',
+            ],
+        ];
+    }
+
+    $name = $activeTarget['avatar_name'] ?: 'Your pet';
+    $progress = (float)($activeTarget['progress'] ?? 0);
+    $remaining = max(0, (float)$activeTarget['target_amount'] - (float)$activeTarget['current_amount']);
+    $messages = [];
+
+    if ($saved > 0) {
+        $messages[] = "You saved ¥" . number_format($saved) . " today! I can feel us getting closer to our goal.";
+    } else {
+        $messages[] = "Can we save a small amount today? Even ¥100 moves our journey forward.";
+    }
+
+    if ($spent > 0) {
+        $messages[] = "Thanks for tracking ¥" . number_format($spent) . " of spending today. Honest tracking helps us plan, so I am not upset.";
+    } else {
+        $messages[] = "No spending is recorded today. If you buy something, tell me so we can keep our plan honest.";
+    }
+
+    if ($progress >= 100) {
+        $messages[] = "We completed our goal together! I am so proud of you—let us celebrate.";
+    } elseif ($progress >= 75) {
+        $messages[] = "We are at " . round($progress) . "%—the finish line is really close now!";
+    } elseif ($progress >= 40) {
+        $messages[] = "We have already reached " . round($progress) . "%. Our steady steps are working.";
+    } else {
+        $messages[] = "We have ¥" . number_format($remaining) . " left. No rush; consistency will get us there.";
+    }
+
+    return [
+        'pet_name' => $name,
+        'tone' => $saved > 0 ? 'proud' : 'encouraging',
+        'summary' => "$name is talking from today's real money activity.",
+        'messages' => $messages,
+        'today_saved' => $saved,
+        'today_spent' => $spent,
+    ];
 }
 
 function avatarUnlockNames()

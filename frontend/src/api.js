@@ -87,6 +87,14 @@ export const dashboard = {
   get: () => api("dashboard"),
 };
 
+export const dailyQuests = {
+  claim: (questId) =>
+    api("daily-quests/claim", {
+      method: "POST",
+      body: { quest_id: questId },
+    }),
+};
+
 export const targets = {
   list: (status = "active") => api(`targets?status=${status}`),
   create: (data) => api("targets", { method: "POST", body: data }),
@@ -103,6 +111,10 @@ export const transactions = {
 //calendar
 export const calendar = {
   get: () => api("calendar"),
+};
+
+export const avatars = {
+  care: (data) => api("avatars/care", { method: "POST", body: data }),
 };
 
 export const shop = {

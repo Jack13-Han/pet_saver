@@ -17,10 +17,15 @@ import {
   Trophy,
   Award,
   PiggyBank,
+  MessageCircle,
+  Gift,
+  CheckCircle2,
 } from "lucide-react";
 import {
   dashboard as dashboardApi,
+  dailyQuests as dailyQuestApi,
   transactions as txApi,
+  avatars as avatarApi,
   user as userApi,
   targets as targetApi,
   calendar as calendarApi,
@@ -52,12 +57,20 @@ const formatDateKey = (date) => {
 
 const money = (amount = 0) => `¥${Number(amount || 0).toLocaleString()}`;
 
+const careActions = [
+  { id: "play", icon: "🎾", title: "Play", effect: "+10 Happiness" },
+  { id: "feed", icon: "🍖", title: "Feed", effect: "+10 Fullness" },
+  { id: "rest", icon: "🛏️", title: "Rest", effect: "+10 Energy" },
+  { id: "shower", icon: "🚿", title: "Shower", effect: "+5 Happiness" },
+];
+
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [calendarData, setCalendarData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [petReaction, setPetReaction] = useState(null);
+  const [conversationIndex, setConversationIndex] = useState(0);
   const [animatingPet, setAnimatingPet] = useState(false);
   const [petPointer, setPetPointer] = useState({ x: 0, y: 0 });
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -94,6 +107,12 @@ export default function Dashboard() {
     }
   };
   const target = data?.activeTarget;
+  const dailyQuests = data?.dailyQuests || [];
+  const petConversation = data?.petConversation;
+  const conversationMessages = petConversation?.messages || [];
+  const currentConversation = conversationMessages.length
+    ? conversationMessages[conversationIndex % conversationMessages.length]
+    : "Every small money step matters. I am here with you.";
   const progress = target?.progress || 0;
   const deadlineEnd = target?.deadline
     ? new Date(`${target.deadline}T23:59:59`)
@@ -367,6 +386,26 @@ export default function Dashboard() {
       showToast(err.message || "Care action failed", "error");
     }
   };
+  const handleClaimDailyQuest = async (questId) => {
+    try {
+      const res = await dailyQuestApi.claim(questId);
+      const coinsEarned = Number(res.data?.coins || 0);
+      setData((prev) => ({
+        ...prev,
+        dailyQuests: res.data?.quests || prev.dailyQuests,
+        user: {
+          ...prev.user,
+          coins: Number(prev.user?.coins || 0) + coinsEarned,
+        },
+      }));
+      updateUser({ coins: Number(user?.coins || 0) + coinsEarned });
+      showPetReaction(res.data?.pet_reaction);
+      showToast(`Daily quest complete! +${coinsEarned} coins`);
+    } catch (err) {
+      showToast(err.message || "Failed to claim daily quest", "error");
+    }
+  };
+
   const deleteExpiredGoal = async () => {
     if (!target || deletingExpiredGoal) return;
     setDeletingExpiredGoal(true);
@@ -639,6 +678,24 @@ export default function Dashboard() {
               </div>
 
               <div className="pet-bond-panel">
+                <div className="pet-conversation-card">
+                  <div className="pet-conversation-avatar">
+                    <MessageCircle size={20} />
+                  </div>
+                  <div className="pet-conversation-copy">
+                    <span>{target.avatar_name} says</span>
+                    <p>{currentConversation}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="pet-talk-again"
+                    onClick={() => setConversationIndex((index) => index + 1)}
+                    disabled={conversationMessages.length <= 1}
+                  >
+                    <RotateCw size={14} /> Talk again
+                  </button>
+                </div>
+
                 <div className="pet-level-row">
                   <div>
                     <strong>Bond Level {target.level || 1}</strong>
@@ -1417,6 +1474,52 @@ export default function Dashboard() {
 
         {/* RIGHT SIDEBAR */}
         <div className="dashboard-side">
+          <motion.div
+            className="card daily-quests-card"
+            initial={{ x: 20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.12 }}
+          >
+            <div className="card-header">
+              <div>
+                <h3 className="card-title"><Gift size={19} /> Daily Money Quests</h3>
+                <p className="daily-quest-subtitle">Small money habits grow your pet bond.</p>
+              </div>
+              <span className="daily-quest-total">
+                {dailyQuests.filter((quest) => quest.claimed).length}/{dailyQuests.length}
+              </span>
+            </div>
+
+            <div className="daily-quest-list">
+              {dailyQuests.map((quest) => (
+                <div className={`daily-quest-item ${quest.claimed ? "claimed" : ""}`} key={quest.id}>
+                  <span className="daily-quest-icon">{quest.icon}</span>
+                  <div className="daily-quest-copy">
+                    <strong>{quest.title}</strong>
+                    <span>{quest.description}</span>
+                    <div className="daily-quest-progress">
+                      <div style={{ width: `${Math.min(100, (quest.progress / quest.target) * 100)}%` }} />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="daily-quest-claim"
+                    disabled={!quest.completed || quest.claimed}
+                    onClick={() => handleClaimDailyQuest(quest.id)}
+                  >
+                    {quest.claimed
+                      ? <CheckCircle2 size={17} />
+                      : quest.completed
+                        ? `+${quest.reward}`
+                        : quest.id === "save_today"
+                          ? `¥${Number(quest.progress).toLocaleString()}/¥${Number(quest.target).toLocaleString()}`
+                          : `${quest.progress}/${quest.target}`}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+
           {/* CURRENT GOAL */}
           {target && (
             <motion.div
