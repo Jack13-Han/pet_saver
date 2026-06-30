@@ -1764,6 +1764,59 @@ body {
   font-weight: 700;
 }
 
+.shop-notification-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 28px 16px;
+  pointer-events: auto;
+}
+
+.shop-notification {
+  width: min(360px, calc(100vw - 32px));
+  min-height: 146px;
+  padding: 18px 20px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.18);
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+
+.shop-notification.success {
+  border-color: rgba(74, 222, 128, 0.45);
+}
+
+.shop-notification.error {
+  border-color: rgba(239, 68, 68, 0.34);
+}
+
+.shop-notification-animation {
+  width: 104px;
+  height: 104px;
+}
+
+.shop-notification-copy h3 {
+  margin: 0 0 6px;
+  color: var(--text-primary);
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.shop-notification-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 /* ACHIEVEMENTS */
 .achievement-grid {
   display: grid;
@@ -3078,6 +3131,15 @@ select.form-input {
   }
   .shop-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .shop-notification {
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 12px;
+    padding: 14px;
+  }
+  .shop-notification-animation {
+    width: 82px;
+    height: 82px;
   }
   .achievement-grid {
     grid-template-columns: 1fr;
