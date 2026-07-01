@@ -17,10 +17,10 @@ export const avatarTypes = [
   { id: "rabbit", emoji: "\u{1F407}", name: "Rabbit", requiresPurchase: true },
   { id: "pig", emoji: "\u{1F437}", name: "Pig", requiresPurchase: true },
   { id: "bird", emoji: "\u{1F426}", name: "Bird", requiresPurchase: true },
-  { id: "naruto", emoji: "\u{1F365}", name: "Naruto", requiresPurchase: true },
-  { id: "pikachu", emoji: "\u{26A1}", name: "Pikachu", requiresPurchase: true },
-  { id: "chiikawa", emoji: "\u{1F439}", name: "Chiikawa", requiresPurchase: true },
-  { id: "lufy", emoji: "\u{1F3F4}\u{200D}\u{2620}\u{FE0F}", name: "Lufy", requiresPurchase: true },
+  { id: "lion", emoji: "\u{1F981}", name: "Lion", requiresPurchase: true },
+  { id: "giraffe", emoji: "\u{1F992}", name: "Giraffe", requiresPurchase: true },
+  { id: "panda", emoji: "\u{1F43C}", name: "Panda", requiresPurchase: true },
+  { id: "fox", emoji: "\u{1F98A}", name: "Fox", requiresPurchase: true },
 ];
 
 export const avatarEmojis = Object.fromEntries(
@@ -37,13 +37,15 @@ const getPetImageState = (target) => {
 
 export const getPetImage = (avatarType = "cat", state = "idle") => {
   const type = String(avatarType || "cat").toLowerCase();
-  const assetType = type === "lufy" ? "luffy" : type;
   const imageState = String(state || "idle").toLowerCase();
+  const emojiOnlyTypes = ["bird", "lion", "giraffe", "panda", "fox"];
+
+  if (emojiOnlyTypes.includes(type)) return null;
 
   return (
-    petImages[`${assetType}_${imageState}`] ||
-    petImages[`${assetType}_idle`] ||
-    petImages[assetType] ||
+    petImages[`${type}_${imageState}`] ||
+    petImages[`${type}_idle`] ||
+    petImages[type] ||
     petImages[`cat_${imageState}`] ||
     petImages.cat_idle
   );

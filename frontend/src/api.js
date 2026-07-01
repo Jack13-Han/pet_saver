@@ -111,6 +111,9 @@ export const transactions = {
 //calendar
 export const calendar = {
   get: () => api("calendar"),
+  saveSettings: (data) => api("calendar/settings", { method: "POST", body: data }),
+  saveNote: (data) => api("calendar/notes", { method: "POST", body: data }),
+  deleteNote: (id) => api(`calendar/notes/${id}`, { method: "DELETE" }),
 };
 
 export const avatars = {
