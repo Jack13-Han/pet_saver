@@ -1276,6 +1276,46 @@ body {
   text-align: center;
 }
 
+.finance-calendar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.finance-calendar-month-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+  text-align: center;
+}
+
+.finance-calendar-nav {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.finance-calendar-nav:hover:not(:disabled) {
+  background: var(--border-color);
+  transform: scale(1.05);
+}
+
+.finance-calendar-nav:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .finance-calendar-weekdays,
 .finance-calendar-grid {
   display: grid;
