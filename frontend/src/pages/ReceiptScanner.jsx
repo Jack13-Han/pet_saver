@@ -130,6 +130,7 @@ export default function ReceiptScanner() {
   const [saving, setSaving] = useState(false)
   const [petReaction, setPetReaction] = useState(null)
   const [dragOver, setDragOver] = useState(false)
+  const [loading, setLoading] = useState(true)
   const fileInputRef = useRef(null)
 
   React.useEffect(() => {
@@ -138,6 +139,7 @@ export default function ReceiptScanner() {
 
   const loadInitialData = async () => {
     try {
+      setLoading(true)
       const [targetRes, receiptRes] = await Promise.all([
         targetApi.list('active'),
         receiptApi.list(),
@@ -146,6 +148,8 @@ export default function ReceiptScanner() {
       setReceipts(receiptRes.data || [])
     } catch (err) {
       console.error(err)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -218,6 +222,13 @@ export default function ReceiptScanner() {
       setSaving(false)
     }
   }
+
+  if (loading)
+    return (
+      <div className="loading-screen">
+        <div className="loading-paw">🐾</div>
+      </div>
+    );
 
   return (
     <div className="animate-fade-in">

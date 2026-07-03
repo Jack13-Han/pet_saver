@@ -130,7 +130,7 @@ export default function Insights() {
   if (loading) {
     return (
       <div className="loading-screen">
-        <div className="loading-paw">...</div>
+        <div className="loading-paw">🐾</div>
         <p>Analyzing your spending data...</p>
       </div>
     )
