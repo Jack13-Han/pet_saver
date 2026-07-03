@@ -469,6 +469,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  align-self: stretch;
 }
 
 /* PET CARD */
@@ -2540,11 +2541,19 @@ body {
 
 .dashboard-achievements-card {
   overflow: hidden;
+  flex: 1;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
 }
 
 .side-achievement-grid {
   display: grid;
   gap: 10px;
+  align-content: start;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .side-achievement-card {

@@ -163,7 +163,7 @@ export default function Dashboard() {
   const [savingCalendarNote, setSavingCalendarNote] = useState(false);
   const [dailyLimitInput, setDailyLimitInput] = useState("");
   const [savingDailyLimit, setSavingDailyLimit] = useState(false);
-  const [calendarMonthKey, setCalendarMonthKey] = useState(() => formatMonthKey(new Date()));
+  const [calendarMonthDate, setCalendarMonthDate] = useState(() => startOfMonth(new Date()));
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [petReaction, setPetReaction] = useState(null);
@@ -294,12 +294,12 @@ export default function Dashboard() {
   const customDailyExpenseLimit = Number(calendarSchedule.dailyExpenseLimit || 0);
 
   const selectedCalendarMonth = useMemo(() => {
-    const parts = calendarMonthKey.split("-");
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1;
+    const monthDate = startOfMonth(calendarMonthDate);
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const monthKey = formatMonthKey(monthDate);
     const now = new Date();
     const todayKey = formatDateKey(now);
-    const monthDate = new Date(year, month, 1, 12, 0, 0);
     const firstDay = new Date(year, month, 1, 12, 0, 0);
     const totalDays = new Date(year, month + 1, 0, 12, 0, 0).getDate();
     const activityDays = calendarData
@@ -378,12 +378,12 @@ export default function Dashboard() {
     });
 
     return {
-      key: calendarMonthKey,
+      key: monthKey,
       label: monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
       dailyBudgetLimit,
       cells: [...emptyCells, ...dayCells],
     };
-  }, [calendarMonthKey, calendarData, calendarSchedule.goalDeadlines, calendarSchedule.recurring, calendarSchedule.notes, customDailyExpenseLimit, recurringPreview, totalMonthlyBudget]);
+  }, [calendarMonthDate, calendarData, calendarSchedule.goalDeadlines, calendarSchedule.recurring, calendarSchedule.notes, customDailyExpenseLimit, recurringPreview, totalMonthlyBudget]);
 
   const selectedMonthSummary = useMemo(() => {
     const cells = (selectedCalendarMonth?.cells || []).filter((cell) => !cell.isEmpty);
@@ -403,20 +403,8 @@ export default function Dashboard() {
   }, [selectedCalendarMonth]);
 
   const handleCalendarMonthChange = (direction) => {
-    const parts = calendarMonthKey.split("-");
-    let year = parseInt(parts[0], 10);
-    let month = parseInt(parts[1], 10) - 1;
-
-    month += direction;
-    if (month < 0) {
-      month = 11;
-      year -= 1;
-    } else if (month > 11) {
-      month = 0;
-      year += 1;
-    }
-
-    setCalendarMonthKey(`${year}-${String(month + 1).padStart(2, "0")}`);
+    setSelectedCalendarDay(null);
+    setCalendarMonthDate((currentDate) => addMonths(currentDate, direction));
   };
 
   const selectedCalendarDayDetails = useMemo(() => {
