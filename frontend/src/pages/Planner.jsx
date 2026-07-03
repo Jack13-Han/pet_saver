@@ -213,7 +213,7 @@ export default function Planner() {
     URL.revokeObjectURL(href)
   }
 
-  if (loading) return <div className="loading-screen"><div className="loading-paw">...</div></div>
+  if (loading) return <div className="loading-screen"><div className="loading-paw">🐾</div></div>
 
   return (
     <div className="animate-fade-in" style={{ paddingBottom: 40 }}>

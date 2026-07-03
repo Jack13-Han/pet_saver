@@ -71,32 +71,32 @@ const AVATAR_UNLOCKS = [
         'icon' => 'bird',
     ],
     [
-        'type' => 'naruto',
-        'name' => 'Naruto Avatar',
-        'description' => 'Unlock the Naruto avatar for new goals',
+        'type' => 'lion',
+        'name' => 'Lion Avatar',
+        'description' => 'Unlock the lion avatar for new goals',
         'price' => 900,
-        'icon' => 'naruto',
+        'icon' => 'lion',
     ],
     [
-        'type' => 'pikachu',
-        'name' => 'Pikachu Avatar',
-        'description' => 'Unlock the Pikachu avatar for new goals',
+        'type' => 'giraffe',
+        'name' => 'Giraffe Avatar',
+        'description' => 'Unlock the giraffe avatar for new goals',
         'price' => 1000,
-        'icon' => 'pikachu',
+        'icon' => 'giraffe',
     ],
     [
-        'type' => 'chiikawa',
-        'name' => 'Chiikawa Avatar',
-        'description' => 'Unlock the Chiikawa avatar for new goals',
+        'type' => 'panda',
+        'name' => 'Panda Avatar',
+        'description' => 'Unlock the panda avatar for new goals',
         'price' => 1100,
-        'icon' => 'chiikawa',
+        'icon' => 'panda',
     ],
     [
-        'type' => 'lufy',
-        'name' => 'Lufy Avatar',
-        'description' => 'Unlock the Lufy avatar for new goals',
+        'type' => 'fox',
+        'name' => 'Fox Avatar',
+        'description' => 'Unlock the fox avatar for new goals',
         'price' => 1200,
-        'icon' => 'lufy',
+        'icon' => 'fox',
     ],
 ];
 
@@ -835,9 +835,84 @@ if ($path === 'calendar' && $method === 'GET') {
 
     $stmt->execute([$userId]);
 
-    successResponse(
-        $stmt->fetchAll()
-    );
+    $transactionDays = $stmt->fetchAll();
+
+    $stmt = $pdo->prepare("
+        SELECT id, name, deadline, target_amount, current_amount, status
+        FROM targets
+        WHERE user_id = ? AND status = 'active' AND deadline IS NOT NULL
+        ORDER BY deadline ASC
+    ");
+    $stmt->execute([$userId]);
+    $goalDeadlines = $stmt->fetchAll();
+
+    $stmt = $pdo->prepare("
+        SELECT id, target_id, name, amount, type, category, frequency, next_run_date
+        FROM recurring_entries
+        WHERE user_id = ? AND is_active = 1
+        ORDER BY next_run_date ASC, id DESC
+    ");
+    $stmt->execute([$userId]);
+    $recurringEntries = $stmt->fetchAll();
+    $budgetRows = getBudgetRows($pdo, $userId);
+    $stmt = $pdo->prepare("SELECT id, event_date, title, note, created_at FROM calendar_notes WHERE user_id = ? ORDER BY event_date ASC, id DESC");
+    $stmt->execute([$userId]);
+    $calendarNotes = $stmt->fetchAll();
+    $stmt = $pdo->prepare("SELECT daily_expense_limit FROM calendar_preferences WHERE user_id = ? LIMIT 1");
+    $stmt->execute([$userId]);
+    $dailyExpenseLimit = (float)($stmt->fetchColumn() ?: 0);
+
+    successResponse([
+        'days' => $transactionDays,
+        'goal_deadlines' => $goalDeadlines,
+        'recurring' => $recurringEntries,
+        'budgets' => $budgetRows,
+        'notes' => $calendarNotes,
+        'daily_expense_limit' => $dailyExpenseLimit,
+    ]);
+}
+
+if ($path === 'calendar/settings' && $method === 'POST') {
+    $limitInput = $input['daily_expense_limit'] ?? null;
+    $dailyExpenseLimit = is_numeric($limitInput) ? round((float)$limitInput, 2) : -1;
+    if ($dailyExpenseLimit < 0 || !is_finite($dailyExpenseLimit) || $dailyExpenseLimit > MAX_MONEY_AMOUNT) {
+        errorResponse('Daily expense limit must be between 0 and 9,999,999,999,999.99');
+    }
+
+    $stmt = $pdo->prepare("
+        INSERT INTO calendar_preferences (user_id, daily_expense_limit)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE daily_expense_limit = VALUES(daily_expense_limit), updated_at = CURRENT_TIMESTAMP
+    ");
+    $stmt->execute([$userId, $dailyExpenseLimit]);
+    successResponse(['daily_expense_limit' => $dailyExpenseLimit], 'Daily expense limit saved');
+}
+
+if ($path === 'calendar/notes' && $method === 'POST') {
+    $eventDate = trim($input['event_date'] ?? '');
+    $title = trim($input['title'] ?? '');
+    $note = trim($input['note'] ?? '');
+    $parsedDate = DateTime::createFromFormat('Y-m-d', $eventDate);
+
+    if (!$parsedDate || $parsedDate->format('Y-m-d') !== $eventDate || $title === '') {
+        errorResponse('A valid date and title are required');
+    }
+
+    $title = function_exists('mb_substr') ? mb_substr($title, 0, 100) : substr($title, 0, 100);
+    $note = function_exists('mb_substr') ? mb_substr($note, 0, 500) : substr($note, 0, 500);
+    $stmt = $pdo->prepare("INSERT INTO calendar_notes (user_id, event_date, title, note) VALUES (?, ?, ?, ?)");
+    $stmt->execute([$userId, $eventDate, $title, $note]);
+    $noteId = (int)$pdo->lastInsertId();
+
+    $stmt = $pdo->prepare("SELECT id, event_date, title, note, created_at FROM calendar_notes WHERE id = ? AND user_id = ?");
+    $stmt->execute([$noteId, $userId]);
+    successResponse($stmt->fetch(), 'Calendar note saved');
+}
+
+if (preg_match('/^calendar\/notes\/(\d+)$/', $path, $m) && $method === 'DELETE') {
+    $stmt = $pdo->prepare("DELETE FROM calendar_notes WHERE id = ? AND user_id = ?");
+    $stmt->execute([intval($m[1]), $userId]);
+    successResponse(null, 'Calendar note deleted');
 }
 
 if ($path === 'avatars/care' && $method === 'POST') {
@@ -1503,6 +1578,29 @@ function ensureFinanceFeatureTables($pdo)
     ");
 
     $pdo->exec("
+        CREATE TABLE IF NOT EXISTS calendar_notes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            event_date DATE NOT NULL,
+            title VARCHAR(100) NOT NULL,
+            note VARCHAR(500) DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_calendar_notes_user_date (user_id, event_date)
+        )
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS calendar_preferences (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            daily_expense_limit DECIMAL(15,2) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_calendar_preferences_user (user_id)
+        )
+    ");
+
+    $pdo->exec("
         CREATE TABLE IF NOT EXISTS mission_claims (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
@@ -1681,8 +1779,11 @@ function ensureTargetAvatarTypes($pdo)
 {
     try {
         $column = $pdo->query("SHOW COLUMNS FROM targets LIKE 'avatar_type'")->fetch();
-        if ($column && strpos($column['Type'], "'lufy'") === false) {
-            $pdo->exec("ALTER TABLE targets MODIFY avatar_type ENUM('dog','cat','tree','bird','rabbit','pig','naruto','pikachu','chiikawa','lufy') DEFAULT 'dog'");
+        if ($column && preg_match("/'(?:naruto|pikachu|chiikawa|lufy)'/", $column['Type'])) {
+            $pdo->exec("UPDATE targets SET avatar_type = 'dog' WHERE avatar_type IN ('naruto','pikachu','chiikawa','lufy')");
+        }
+        if ($column && (strpos($column['Type'], "'lion'") === false || preg_match("/'(?:naruto|pikachu|chiikawa|lufy)'/", $column['Type']))) {
+            $pdo->exec("ALTER TABLE targets MODIFY avatar_type ENUM('dog','cat','tree','bird','rabbit','pig','lion','giraffe','panda','fox') DEFAULT 'dog'");
         }
     } catch (Throwable $e) {
         // Older local databases may already be compatible or lack DDL permissions.
@@ -2232,6 +2333,7 @@ function checkAchievements($pdo, $userId)
         UPDATE achievements
         SET unlocked_at =
             IF(is_unlocked = 1 AND unlocked_at IS NULL, NOW(), unlocked_at)
+        WHERE user_id = ?
     ")->execute([$userId]);
 }
 

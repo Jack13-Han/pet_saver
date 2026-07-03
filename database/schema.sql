@@ -38,10 +38,10 @@ CREATE TABLE
             'bird',
             'rabbit',
             'pig',
-            'naruto',
-            'pikachu',
-            'chiikawa',
-            'lufy'
+            'lion',
+            'giraffe',
+            'panda',
+            'fox'
         ) DEFAULT 'dog',
         avatar_name VARCHAR(50) DEFAULT 'Mochi',
         completion_date TIMESTAMP NULL,
@@ -197,6 +197,29 @@ CREATE TABLE
     );
 
 CREATE TABLE
+    calendar_notes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        event_date DATE NOT NULL,
+        title VARCHAR(100) NOT NULL,
+        note VARCHAR(500) DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_calendar_notes_user_date (user_id, event_date),
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    );
+
+CREATE TABLE
+    calendar_preferences (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        daily_expense_limit DECIMAL(15, 2) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_calendar_preferences_user (user_id),
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    );
+
+CREATE TABLE
     mission_claims (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
@@ -319,34 +342,34 @@ VALUES
         0
     ),
     (
-        'Naruto Avatar',
-        'Unlock the Naruto avatar for new goals',
+        'Lion Avatar',
+        'Unlock the lion avatar for new goals',
         900,
-        'naruto',
+        'lion',
         'avatar',
         0
     ),
     (
-        'Pikachu Avatar',
-        'Unlock the Pikachu avatar for new goals',
+        'Giraffe Avatar',
+        'Unlock the giraffe avatar for new goals',
         1000,
-        'pikachu',
+        'giraffe',
         'avatar',
         0
     ),
     (
-        'Chiikawa Avatar',
-        'Unlock the Chiikawa avatar for new goals',
+        'Panda Avatar',
+        'Unlock the panda avatar for new goals',
         1100,
-        'chiikawa',
+        'panda',
         'avatar',
         0
     ),
     (
-        'Lufy Avatar',
-        'Unlock the Lufy avatar for new goals',
+        'Fox Avatar',
+        'Unlock the fox avatar for new goals',
         1200,
-        'lufy',
+        'fox',
         'avatar',
         0
     );
