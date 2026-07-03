@@ -205,6 +205,7 @@ export default function Dashboard() {
     : 100;
   const petMood = getMoodFromProgress(progress);
   const shopPreview = (data?.shopPreview || []).filter(item => !['glasses', 'scarf'].includes(item.category));
+  const achievementsPreview = data?.achievements?.slice(0, 4) || [];
   const getShopPreviewIcon = (item) => {
     if (item.avatar_type) return avatarTypes.find(type => type.id === item.avatar_type)?.emoji || item.icon;
     return item.icon;
@@ -340,7 +341,7 @@ export default function Dashboard() {
   const handleCare = async (action) => {
     if (!data?.activeTarget || caringAction) return;
     if (careActionsRemaining <= 0) {
-      showToast("Sorry,thats all for today", "error");
+      showToast("Daily care limit reached. Come back tomorrow.", "error");
       return;
     }
     setCaringAction(action.id);
@@ -355,11 +356,12 @@ export default function Dashboard() {
         exp_gain: Number(res.data?.exp_gain || 0),
         happiness_gain: action.id === "play" ? 10 : action.id === "shower" ? 5 : 0,
       });
-      showToast(
-        res.data?.rewarded
-          ? `${action.title} completed! +${res.data.exp_gain} EXP ✨`
-          : `${action.title} completed! Daily EXP limit is already reached.`,
-      );
+      const nextRemaining = Number(res.data?.care_actions_remaining ?? 0);
+      if (nextRemaining <= 0) {
+        showToast(`${action.title} complete. Daily care limit reached.`);
+      } else {
+        showToast(`${action.title} complete. ${nextRemaining}/3 care rewards left today.`);
+      }
       setData((prev) => ({
         ...prev,
         activeTarget: {
@@ -1436,7 +1438,8 @@ export default function Dashboard() {
             </motion.div>
           </div>
 
-          {/* ACHIEVEMENTS */}
+          {/* ACHIEVEMENTS moved to the right sidebar */}
+          {false && (
           <motion.div
             className="card"
             initial={{ y: 20, opacity: 0 }}
@@ -1474,6 +1477,7 @@ export default function Dashboard() {
               ))}
             </div>
           </motion.div>
+          )}
         </div>
 
         {/* RIGHT SIDEBAR */}
@@ -1665,6 +1669,47 @@ export default function Dashboard() {
               >
                 🪙 Earn coins by saving and completing challenges!
               </span>
+            </div>
+          </motion.div>
+
+          {/* ACHIEVEMENTS */}
+          <motion.div
+            className="card dashboard-achievements-card"
+            initial={{ x: 20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.58 }}
+          >
+            <div className="card-header">
+              <h3 className="card-title">🏆 Achievements</h3>
+              <button
+                className="card-action"
+                onClick={() => navigate("/achievements")}
+              >
+                View All
+              </button>
+            </div>
+            <div className="side-achievement-grid">
+              {achievementsPreview.map((ach) => (
+                <button
+                  type="button"
+                  key={ach.id}
+                  className={`side-achievement-card ${ach.is_unlocked ? "unlocked" : ""}`}
+                  onClick={() => navigate("/achievements")}
+                >
+                  <span className={`side-achievement-icon ${ach.tier}`}>
+                    {ach.is_unlocked ? "✓" : "🔒"}
+                  </span>
+                  <span className="side-achievement-copy">
+                    <strong>{ach.title}</strong>
+                    <small>{ach.description}</small>
+                  </span>
+                </button>
+              ))}
+              {achievementsPreview.length === 0 && (
+                <div className="side-achievement-empty">
+                  Complete quests and saving goals to unlock achievements.
+                </div>
+              )}
             </div>
           </motion.div>
         </div>
