@@ -559,20 +559,6 @@ body {
   border-radius: var(--radius-lg);
 }
 
-.pet-scene::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    circle at var(--spotlight-x, 50%) var(--spotlight-y, 45%),
-    rgba(255, 255, 255, 0.82) 0%,
-    rgba(255, 255, 255, 0.34) 32%,
-    rgba(251, 146, 60, 0.1) 66%,
-    transparent 100%
-  );
-  pointer-events: none;
-}
-
 .pet-character {
   font-size: 120px;
   line-height: 1;
@@ -629,79 +615,56 @@ body {
   }
 }
 
-.pet-follow-eyes {
-  position: absolute;
-  top: 43%;
-  left: 50%;
-  display: flex;
-  gap: 18px;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  opacity: 0.88;
-}
-
-.pet-follow-eye {
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(17, 24, 39, 0.12);
-  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.pet-follow-eye span {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: #111827;
-  transform: translate(var(--pet-eye-x, 0), var(--pet-eye-y, 0));
-  transition: transform 0.08s ease-out;
-}
-
-.pet-progress-strip {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(251, 146, 60, 0.24);
-  border-radius: var(--radius-lg);
-}
-
-.pet-progress-strip > div:first-child {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.pet-progress-strip strong {
-  color: var(--text-main);
-  font-size: 18px;
-}
-
-.pet-progress-track {
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.08);
-  overflow: hidden;
-}
-
-.pet-progress-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #22c55e, #2563eb);
-  transition: width 0.45s ease;
-}
-
 .finance-calendar-card {
   overflow: hidden;
+}
+
+.finance-calendar-month {
+  display: grid;
+  gap: 12px;
+}
+
+.finance-calendar-toolbar {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.finance-calendar-month-title {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 16px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.finance-calendar-nav {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.finance-calendar-nav:hover:not(:disabled),
+.finance-calendar-nav:focus-visible:not(:disabled) {
+  border-color: #2563eb;
+  color: #2563eb;
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.finance-calendar-nav:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
 }
 
 .pet-stat-value {
@@ -2344,6 +2307,59 @@ body {
   font-weight: 700;
 }
 
+.shop-notification-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 28px 16px;
+  pointer-events: auto;
+}
+
+.shop-notification {
+  width: min(360px, calc(100vw - 32px));
+  min-height: 146px;
+  padding: 18px 20px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.18);
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+
+.shop-notification.success {
+  border-color: rgba(74, 222, 128, 0.45);
+}
+
+.shop-notification.error {
+  border-color: rgba(239, 68, 68, 0.34);
+}
+
+.shop-notification-animation {
+  width: 104px;
+  height: 104px;
+}
+
+.shop-notification-copy h3 {
+  margin: 0 0 6px;
+  color: var(--text-primary);
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.shop-notification-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
 /* ACHIEVEMENTS */
 .achievement-grid {
   display: grid;
@@ -3661,6 +3677,15 @@ select.form-input {
   }
   .shop-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .shop-notification {
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 12px;
+    padding: 14px;
+  }
+  .shop-notification-animation {
+    width: 82px;
+    height: 82px;
   }
   .achievement-grid {
     grid-template-columns: 1fr;
