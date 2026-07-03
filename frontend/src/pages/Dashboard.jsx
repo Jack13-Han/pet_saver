@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import Lottie from "lottie-react";
 import {
   Edit3,
   Plus,
@@ -39,6 +40,8 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useLanguage } from "../i18n.jsx";
 import { realOCR } from "./ReceiptScanner.jsx";
 import { avatarEmojis, avatarTypes, getPetImageForTarget } from "../petAssets.js";
+import shibaSadAnimation from "../assets/lottie/shiba-sad.json";
+import shoppingAnimation from "../assets/lottie/shopping.json";
 
 const moodEmojis = {
   happy: "😊",
@@ -184,6 +187,7 @@ export default function Dashboard() {
   const [deletingExpiredGoal, setDeletingExpiredGoal] = useState(false);
   const [shopConfirmItem, setShopConfirmItem] = useState(null);
   const [buyingShopItemId, setBuyingShopItemId] = useState(null);
+  const [shopNotice, setShopNotice] = useState(null);
   const fileInputRef = useRef(null);
   const { user, updateUser } = useAuth();
   const { language } = useLanguage();
@@ -253,7 +257,7 @@ export default function Dashboard() {
     ? Math.min(1500, targetRemaining)
     : 1500;
   const petMood = getMoodFromProgress(progress);
-  const shopPreview = (data?.shopPreview || []).filter(item => !['glasses', 'scarf'].includes(item.category));
+  const shopPreview = (data?.shopPreview || []).filter(item => item.category === "avatar" && item.avatar_type);
   const getShopPreviewIcon = (item) => {
     if (item.avatar_type) return avatarTypes.find(type => type.id === item.avatar_type)?.emoji || item.icon;
     return item.icon;
@@ -552,6 +556,12 @@ export default function Dashboard() {
     loadDashboard();
   }, []);
 
+  useEffect(() => {
+    if (!shopNotice) return undefined;
+    const timer = setTimeout(() => setShopNotice(null), 3600);
+    return () => clearTimeout(timer);
+  }, [shopNotice]);
+
   const loadDashboard = async () => {
     try {
       const [dashboardRes, calendarRes, transactionsRes] = await Promise.all([
@@ -602,7 +612,11 @@ export default function Dashboard() {
     }
 
     if (Number(user?.coins || data?.user?.coins || 0) < Number(item.price || 0)) {
-      showToast("Not enough coin", "error");
+      setShopNotice({
+        type: "error",
+        title: "Not enough coins",
+        message: `You need ${Number(item.price || 0).toLocaleString()} coins to unlock ${item.name}.`,
+      });
       return;
     }
 
@@ -627,10 +641,18 @@ export default function Dashboard() {
         )),
       }));
       setShopConfirmItem(null);
-      showToast(`${item.name} purchased!`);
+      setShopNotice({
+        type: "success",
+        title: "Congratulations!",
+        message: `You've unlocked a new avatar: ${item.name}.`,
+      });
       loadDashboard();
     } catch (err) {
-      showToast(err.message || "Purchase failed", "error");
+      setShopNotice({
+        type: "error",
+        title: err.message === "Not enough coins" ? "Not enough coins" : "Purchase failed",
+        message: err.message || "Please try again.",
+      });
     } finally {
       setBuyingShopItemId(null);
     }
@@ -835,6 +857,37 @@ export default function Dashboard() {
             exit={{ x: 100, opacity: 0 }}
           >
             {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {shopNotice && (
+          <motion.div
+            className="shop-notification-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShopNotice(null)}
+          >
+            <motion.div
+              className={`shop-notification ${shopNotice.type}`}
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.96 }}
+              transition={{ duration: 0.22 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Lottie
+                animationData={shopNotice.type === "success" ? shoppingAnimation : shibaSadAnimation}
+                loop={shopNotice.type !== "success"}
+                className="shop-notification-animation"
+              />
+              <div className="shop-notification-copy">
+                <h3>{shopNotice.title}</h3>
+                <p>{shopNotice.message}</p>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
