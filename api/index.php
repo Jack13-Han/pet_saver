@@ -495,10 +495,10 @@ if ($path === 'targets' && $method === 'POST') {
     $isEmergencyTarget = strcasecmp($category, 'Emergency') === 0 || stripos($name, 'emergency') !== false;
 
     if ($isEmergencyTarget) {
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM targets WHERE user_id = ? AND status = 'active' AND (category = 'Emergency' OR name LIKE '%emergency%')");
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM targets WHERE user_id = ? AND status = 'active' AND COALESCE(current_amount, 0) < target_amount AND (category = 'Emergency' OR name LIKE '%emergency%')");
         $stmt->execute([$userId]);
     } else {
-        $stmt = $pdo->prepare("SELECT COUNT(*) FROM targets WHERE user_id = ? AND status = 'active' AND category != 'Emergency' AND name NOT LIKE '%emergency%'");
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM targets WHERE user_id = ? AND status = 'active' AND COALESCE(current_amount, 0) < target_amount AND category != 'Emergency' AND name NOT LIKE '%emergency%'");
         $stmt->execute([$userId]);
     }
     if ($stmt->fetchColumn() > 0) {
@@ -560,7 +560,7 @@ if ($path === 'targets' && $method === 'POST') {
         $totalExcess = 0;
         if (!$isEmergencyTarget) {
             // ROLLOVER LOGIC: Move excess savings from previous targets to this new target
-            $stmt = $pdo->prepare("SELECT id, current_amount, target_amount FROM targets WHERE user_id = ? AND current_amount > target_amount AND id != ?");
+            $stmt = $pdo->prepare("SELECT id, current_amount, target_amount FROM targets WHERE user_id = ? AND status = 'active' AND current_amount > target_amount AND id != ?");
             $stmt->execute([$userId, $targetId]);
             $excessTargets = $stmt->fetchAll();
 
@@ -568,7 +568,7 @@ if ($path === 'targets' && $method === 'POST') {
                 $excess = $et['current_amount'] - $et['target_amount'];
                 $totalExcess += $excess;
                 // Cap the old target to its target_amount
-                $pdo->prepare("UPDATE targets SET current_amount = target_amount WHERE id = ?")->execute([$et['id']]);
+                $pdo->prepare("UPDATE targets SET current_amount = target_amount, status = 'completed', completion_date = COALESCE(completion_date, NOW()) WHERE id = ?")->execute([$et['id']]);
                 // Record a withdrawal for the deduction to balance ledger
                 $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, note, transaction_date) VALUES (?, ?, ?, 'withdrawal', 'Rollover to new goal', NOW())")->execute([$et['id'], $userId, $excess]);
             }
@@ -585,6 +585,7 @@ if ($path === 'targets' && $method === 'POST') {
             $mood = moodFromProgress($progress);
             $pdo->prepare("UPDATE avatars SET mood = ? WHERE target_id = ?")->execute([$mood, $targetId]);
         }
+        finalizeReachedTargets($pdo, $userId);
 
         $pdo->commit();
         successResponse(['target_id' => $targetId], 'Target created');
@@ -691,16 +692,14 @@ if ($path === 'transactions' && $method === 'POST') {
                 $newAmount = max(0, $target['current_amount'] - $amount);
             }
 
-            $isEmergencyTransactionTarget = isEmergencyTarget($target);
-            $amountScopeSql = $isEmergencyTransactionTarget ? 'user_id = ? AND target_id = ?' : 'user_id = ?';
             $stmt = $pdo->prepare("
                 SELECT
                     COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) -
                     COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN amount ELSE 0 END), 0)
                 FROM transactions
-                WHERE $amountScopeSql
+                WHERE user_id = ? AND target_id = ?
             ");
-            $stmt->execute($isEmergencyTransactionTarget ? [$userId, $targetId] : [$userId]);
+            $stmt->execute([$userId, $targetId]);
             $newAmount = max(0, (float)$stmt->fetchColumn());
 
             $progress = $target['target_amount'] > 0 ? ($newAmount / $target['target_amount']) * 100 : 0;
@@ -1835,6 +1834,31 @@ function ensureAvatarShopItems($pdo)
             $stmt->execute([$unlock['name'], $unlock['description'], $unlock['price'], $unlock['icon'], $category]);
         }
     }
+}
+
+function finalizeReachedTargets($pdo, $userId)
+{
+    $pdo->prepare("
+        UPDATE targets
+        SET status = 'completed',
+            completion_date = COALESCE(completion_date, NOW())
+        WHERE user_id = ?
+          AND status = 'active'
+          AND target_amount > 0
+          AND current_amount >= target_amount
+    ")->execute([$userId]);
+
+    $pdo->prepare("
+        UPDATE users u
+        LEFT JOIN targets t
+          ON t.id = u.active_target_id
+         AND t.user_id = u.id
+         AND t.status = 'active'
+        SET u.active_target_id = NULL
+        WHERE u.id = ?
+          AND u.active_target_id IS NOT NULL
+          AND t.id IS NULL
+    ")->execute([$userId]);
 }
 
 function ensureUserPrivacyColumns($pdo)

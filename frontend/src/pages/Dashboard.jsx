@@ -562,7 +562,7 @@ export default function Dashboard() {
 
       setData(dashboardRes.data);
       setAllTransactions(transactionsRes.data || []);
-      
+
       if (calendarRes.data) {
         const calendarPayload = calendarRes.data;
         const dayRows = Array.isArray(calendarPayload) ? calendarPayload : (calendarPayload.days || []);
@@ -704,27 +704,20 @@ export default function Dashboard() {
 
   const handlePetSavingMission = async () => {
     if (!data?.activeTarget) return;
-
-    try {
-      const res = await txApi.create({
-        target_id: data.activeTarget.id,
-        amount: petSavingAmount,
-        type: "deposit",
-        category: "Pet Saving",
-        note: `Pet Saving • Daily mission for ${data.activeTarget.avatar_name || data.activeTarget.name}`,
-        date: new Date().toISOString().split("T")[0],
-      });
-
-      showPetReaction(res.data?.pet_reaction);
-      showToast(`Pet mission complete! Saved ¥${petSavingAmount.toLocaleString()} for ${data.activeTarget.avatar_name}.`);
-      loadDashboard();
-    } catch (err) {
-      showToast(err.message || "Pet saving mission failed", "error");
-    }
+    setSaveAmount(String(petSavingAmount));
+    setTransactionDate(formatDateKey(new Date()));
+    setTransactionType("deposit");
+    setTransactionCategory("Pet Saving");
+    setTransactionNote(`Daily mission for ${data.activeTarget.avatar_name || data.activeTarget.name}`);
+    setShowSaveModal(true);
   };
 
   const handleCare = async (action) => {
     if (!data?.activeTarget || caringAction) return;
+    if (careActionsRemaining <= 0) {
+      showToast("Sorry,thats all for today", "error");
+      return;
+    }
     setCaringAction(action.id);
     try {
       const res = await avatarApi.care({
@@ -2005,6 +1998,7 @@ export default function Dashboard() {
                         onChange={(e) => setTransactionCategory(e.target.value)}
                       >
                         <option value="General">General</option>
+                        <option value="Pet Saving">Pet Saving</option>
                         <option value="Food">Food</option>
                         <option value="Shopping">Shopping</option>
                         <option value="Transport">Transport</option>

@@ -1,18 +1,27 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Lottie from 'lottie-react'
 import { Coins, Eye, Lock, X } from 'lucide-react'
 import { shop as shopApi } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { avatarTypes } from '../petAssets.js'
+import shibaSadAnimation from '../assets/lottie/shiba-sad.json'
+import shoppingAnimation from '../assets/lottie/shopping.json'
 
 export default function Shop() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [purchasing, setPurchasing] = useState(null)
+  const [notice, setNotice] = useState(null)
   const [previewItem, setPreviewItem] = useState(null)
   const { user, updateUser } = useAuth()
 
   useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    if (!notice) return undefined
+    const timer = setTimeout(() => setNotice(null), 3600)
+    return () => clearTimeout(timer)
+  }, [notice])
 
   const loadData = async () => {
     try {
@@ -23,14 +32,33 @@ export default function Shop() {
   }
 
   const handleBuy = async (item) => {
+    if (purchasing) return
     if (item.owned) return
-    if (user.coins < item.price) { alert('Not enough coins!'); return }
+    if ((user?.coins || 0) < item.price) {
+      setNotice({
+        type: 'error',
+        title: 'Not enough coins',
+        message: `You need ${item.price.toLocaleString()} coins to unlock ${item.name}.`,
+      })
+      return
+    }
     setPurchasing(item.id)
     try {
       await shopApi.buy(item.id)
       updateUser({ coins: user.coins - item.price })
-      loadData()
-    } catch (err) { alert(err.message) }
+      setNotice({
+        type: 'success',
+        title: 'Congratulations!',
+        message: `You've unlocked a new avatar: ${item.name}.`,
+      })
+      await loadData()
+    } catch (err) {
+      setNotice({
+        type: 'error',
+        title: err.message === 'Not enough coins' ? 'Not enough coins' : 'Purchase failed',
+        message: err.message || 'Please try again.',
+      })
+    }
     finally { setPurchasing(null) }
   }
 
@@ -44,6 +72,37 @@ export default function Shop() {
 
   return (
     <div className="animate-fade-in">
+      <AnimatePresence>
+        {notice && (
+          <motion.div
+            className="shop-notification-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setNotice(null)}
+          >
+            <motion.div
+              className={`shop-notification ${notice.type}`}
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.96 }}
+              transition={{ duration: 0.22 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Lottie
+                animationData={notice.type === 'success' ? shoppingAnimation : shibaSadAnimation}
+                loop={notice.type !== 'success'}
+                className="shop-notification-animation"
+              />
+              <div className="shop-notification-copy">
+                <h3>{notice.title}</h3>
+                <p>{notice.message}</p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="page-header">
         <div className="page-title">
           <h2>Shop 🛒</h2>
@@ -77,7 +136,7 @@ export default function Shop() {
               </button>
               {!item.owned && (
                 <button className="btn btn-primary" style={{ marginTop: 12, padding: '8px 16px', fontSize: 13, width: '100%' }}
-                  disabled={purchasing === item.id || user?.coins < item.price}>
+                  disabled={purchasing === item.id}>
                   {purchasing === item.id ? 'Buying...' : user?.coins < item.price ? <><Lock size={14} /> Need coins</> : 'Buy'}
                 </button>
               )}
