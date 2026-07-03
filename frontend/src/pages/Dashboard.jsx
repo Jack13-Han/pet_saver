@@ -1429,7 +1429,7 @@ export default function Dashboard() {
           <AnimatePresence>
             {selectedCalendarDay && selectedCalendarDayDetails && (
               <motion.div
-                className="modal-overlay"
+                className="modal-overlay calendar-day-overlay"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -1457,6 +1457,8 @@ export default function Dashboard() {
                     </button>
                   </div>
 
+                  <div className="calendar-day-content">
+                    <div className="calendar-day-main">
                   <div className="calendar-day-summary">
                     <div>
                       <span>Income</span>
@@ -1588,24 +1590,28 @@ export default function Dashboard() {
                     )}
                   </div>
 
-                  <div className="calendar-day-transactions">
-                    <h4>Transactions</h4>
-                    {selectedCalendarDayDetails.transactions.length === 0 ? (
-                      <p className="calendar-day-empty">No transactions recorded for this day.</p>
-                    ) : (
-                      selectedCalendarDayDetails.transactions.map((tx) => (
-                        <div className="calendar-day-transaction" key={tx.id}>
-                          <div>
-                            <strong>{tx.category || "General"}</strong>
-                            <span>{tx.note || tx.target_name || "No note"}</span>
+                    </div>
+
+                    <aside className="calendar-day-transactions">
+                      <h4>Transactions</h4>
+                      {selectedCalendarDayDetails.transactions.length === 0 ? (
+                        <p className="calendar-day-empty">No transactions recorded for this day.</p>
+                      ) : (
+                        selectedCalendarDayDetails.transactions.map((tx) => (
+                          <div className="calendar-day-transaction" key={tx.id}>
+                            <div>
+                              <strong>{tx.category || "General"}</strong>
+                              <span>{tx.note || tx.target_name || "No note"}</span>
+                            </div>
+                            <strong className={tx.type === "deposit" ? "income" : "expense"}>
+                              {tx.type === "deposit" ? "+" : "-"}{money(tx.amount)}
+                            </strong>
                           </div>
-                          <strong className={tx.type === "deposit" ? "income" : "expense"}>
-                            {tx.type === "deposit" ? "+" : "-"}{money(tx.amount)}
-                          </strong>
-                        </div>
-                      ))
-                    )}
+                        ))
+                      )}
+                    </aside>
                   </div>
+
                 </motion.div>
               </motion.div>
             )}

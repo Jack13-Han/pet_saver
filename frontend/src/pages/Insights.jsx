@@ -24,6 +24,7 @@ import {
   YAxis,
 } from 'recharts'
 import { transactions as txApi, finance } from '../api.js'
+import { useLanguage } from '../i18n.jsx'
 
 const emptyInsights = {
   categories: [],
@@ -45,6 +46,7 @@ const categoryMeta = {
 const money = (value) => `Yen ${Number(value || 0).toLocaleString()}`
 
 export default function Insights() {
+  const { language } = useLanguage()
   const [data, setData] = useState(emptyInsights)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -56,7 +58,7 @@ export default function Insights() {
     setShowWeeklyModal(true)
     setLoadingReport(true)
     try {
-      const res = await finance.weeklyReport()
+      const res = await finance.weeklyReport(language)
       setWeeklyReportText(res.data?.report || 'Failed to generate weekly report.')
     } catch (err) {
       console.error(err)
@@ -406,7 +408,7 @@ export default function Insights() {
                 Weekly AI Finance Report
               </h4>
               <p style={{ color: '#78350F', fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
-                ရက်သတ္တပတ်အတွင်း သင့်ရဲ့ စုဆောင်းမှုနဲ့ သုံးစွဲမှုများကို AI မှ အသေးစိတ် တွက်ချက်သုံးသပ်ပေးပါမည်။
+                Get a personalized AI analysis of this week's spending, savings, and goal progress.
               </p>
               <motion.button
                 whileHover={{ scale: 1.02 }}
@@ -431,7 +433,7 @@ export default function Insights() {
                 }}
               >
                 <Sparkles size={16} />
-                AI အစီရင်ခံစာ ထုတ်ယူမည်
+                Generate AI Report
               </motion.button>
             </div>
           </div>
@@ -531,7 +533,7 @@ export default function Insights() {
                       Weekly AI Report
                     </h3>
                     <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: 0 }}>
-                      ရက်သတ္တပတ် ဘဏ္ဍာရေး သုံးသပ်ချက်
+                      Your personalized 7-day financial summary
                     </p>
                   </div>
                 </div>
@@ -587,7 +589,7 @@ export default function Insights() {
                       <Sparkles size={48} />
                     </motion.div>
                     <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-secondary)' }}>
-                      ဘဏ္ဍာရေး အချက်အလက်များကို AI ဖြင့် သုံးသပ်နေပါသည်...
+                      Analyzing your weekly finances...
                     </p>
                   </div>
                 ) : (

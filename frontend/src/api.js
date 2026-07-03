@@ -160,7 +160,8 @@ export const recurring = {
 
 export const finance = {
   overview: () => api("finance/overview"),
-  weeklyReport: () => api("finance/weekly-report"),
+  weeklyReport: (language = "en") =>
+    api(`finance/weekly-report?language=${encodeURIComponent(language)}`),
   claimMission: (missionId) =>
     api("missions/claim", { method: "POST", body: { mission_id: missionId } }),
 };
