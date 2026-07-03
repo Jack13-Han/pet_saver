@@ -41,7 +41,10 @@ export default function FinanceCalendar({ onChanged }) {
   };
 
   useEffect(() => {
-    loadCalendar().catch(() => showToast("Failed to load calendar", "error"));
+    loadCalendar().catch((err) => {
+      console.error("Calendar Load Error:", err);
+      showToast(`Failed to load calendar: ${err.message || err}`, "error");
+    });
   }, []);
 
   const showToast = (message, type = "success") => {
