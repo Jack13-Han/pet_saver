@@ -74,11 +74,6 @@ export default function Sidebar({ isOpen, onClose }) {
           </div>
         </div>
 
-        <div className="motivation-box hidden sm:flex">
-          <span>🌱</span>
-          <p>Keep saving to help your pet grow!</p>
-        </div>
-
         <button className="nav-item" onClick={logout} style={{ marginTop: 12 }}>
           <LogOut size={20} />
           <span>Logout</span>
