@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { User, Bell, Shield, Palette, LogOut, Save } from 'lucide-react'
+import { User, Bell, Shield, Palette, LogOut, Save, Camera, Trash2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../i18n.jsx'
 
@@ -8,7 +8,12 @@ export default function Settings() {
   const { user, logout, updateUser } = useAuth()
   const { language, setLanguage, languages } = useLanguage()
   const [activeTab, setActiveTab] = useState('profile')
-  const [form, setForm] = useState({ username: user?.username || '', email: user?.email || '' })
+  const [form, setForm] = useState({
+    username: user?.username || '',
+    email: user?.email || '',
+    profile_image: user?.profile_image || '',
+    bio: user?.bio || '',
+  })
   const [privacy, setPrivacy] = useState({
     public_profile: Boolean(Number(user?.public_profile ?? 0)),
     show_on_leaderboard: Boolean(Number(user?.show_on_leaderboard ?? 1)),
@@ -16,6 +21,7 @@ export default function Settings() {
   })
   const [saving, setSaving] = useState(false)
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark')
+  const profileInputRef = useRef(null)
 
   useEffect(() => {
     if (darkMode) {
@@ -28,7 +34,12 @@ export default function Settings() {
   }, [darkMode])
 
   useEffect(() => {
-    setForm({ username: user?.username || '', email: user?.email || '' })
+    setForm({
+      username: user?.username || '',
+      email: user?.email || '',
+      profile_image: user?.profile_image || '',
+      bio: user?.bio || '',
+    })
     setPrivacy(prev => ({
       ...prev,
       public_profile: Boolean(Number(user?.public_profile ?? 0)),
@@ -39,7 +50,10 @@ export default function Settings() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await updateUser(form)
+      await updateUser({
+        ...form,
+        bio: form.bio.trim(),
+      })
       alert('Settings saved!')
     } catch (err) {
       console.error(err)
@@ -47,6 +61,29 @@ export default function Settings() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleProfileImageChange = (event) => {
+    const file = event.target.files?.[0]
+    if (!file || !file.type.startsWith('image/')) return
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const image = new Image()
+      image.onload = () => {
+        const maxSize = 512
+        const ratio = Math.min(1, maxSize / Math.max(image.width, image.height))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(image.width * ratio))
+        canvas.height = Math.max(1, Math.round(image.height * ratio))
+        const context = canvas.getContext('2d')
+        context.drawImage(image, 0, 0, canvas.width, canvas.height)
+        setForm(prev => ({ ...prev, profile_image: canvas.toDataURL('image/jpeg', 0.86) }))
+      }
+      image.src = reader.result
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ''
   }
 
   const updatePrivacy = async (key, value) => {
@@ -101,16 +138,56 @@ export default function Settings() {
             <div className="card settings-panel">
               <h3 className="settings-panel-title">Profile Information</h3>
               <div className="settings-profile-summary">
-                <div className="settings-profile-avatar"><User size={34} /></div>
+                <div className="settings-profile-avatar">
+                  {form.profile_image ? (
+                    <img src={form.profile_image} alt="Profile" className="settings-profile-avatar-img" />
+                  ) : (
+                    <User size={34} />
+                  )}
+                  <button
+                    type="button"
+                    className="settings-profile-edit"
+                    onClick={() => profileInputRef.current?.click()}
+                    aria-label="Edit profile photo"
+                  >
+                    <Camera size={14} />
+                  </button>
+                </div>
                 <div className="settings-profile-copy">
                   <div className="settings-profile-name">{user?.username}</div>
                   <div className="settings-profile-email">{user?.email}</div>
+                  {form.bio && <div className="settings-profile-bio">{form.bio}</div>}
                   <div style={{ marginTop: 4 }}>
                     <span className={`ranking-rank-badge ${user?.rank}`}>{user?.rank}</span>
                   </div>
                 </div>
               </div>
+              <input
+                ref={profileInputRef}
+                type="file"
+                accept="image/*"
+                className="settings-profile-file"
+                onChange={handleProfileImageChange}
+              />
               <div className="settings-form">
+                <div className="settings-profile-photo-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => profileInputRef.current?.click()}
+                  >
+                    <Camera size={18} /> Edit Profile Photo
+                  </button>
+                  {form.profile_image && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setForm(prev => ({ ...prev, profile_image: '' }))}
+                    >
+                      <Trash2 size={18} /> Remove
+                    </button>
+                  )}
+                </div>
                 <div className="form-group">
                   <label>Username</label>
                   <input className="form-input" value={form.username} onChange={e => setForm({...form, username: e.target.value})} />
@@ -118,6 +195,17 @@ export default function Settings() {
                 <div className="form-group">
                   <label>Email</label>
                   <input className="form-input" type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label>Bio</label>
+                  <textarea
+                    className="form-input settings-bio-input"
+                    value={form.bio}
+                    maxLength={280}
+                    onChange={e => setForm({...form, bio: e.target.value})}
+                    placeholder="Write a short profile bio"
+                  />
+                  <div className="settings-bio-count">{form.bio.length}/280</div>
                 </div>
                 <button className="btn btn-primary settings-save" onClick={handleSave} disabled={saving}>
                   <Save size={18} /> {saving ? 'Saving...' : 'Save Changes'}

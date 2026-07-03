@@ -25,6 +25,7 @@ import {
   CheckCircle2,
   BookOpen,
   ArrowRight,
+  User,
 } from "lucide-react";
 import {
   dashboard as dashboardApi,
@@ -1074,9 +1075,18 @@ export default function Dashboard() {
       </AnimatePresence>
 
       <div className="page-header">
-        <div className="page-title">
-          <h2>Hello, {user?.username || data?.user?.username || "Saver"}! 👋</h2>
-          <p>Save toward your target and watch your pet react.</p>
+        <div className="page-title home-title-with-profile">
+          <div className="home-profile-avatar">
+            {user?.profile_image || data?.user?.profile_image ? (
+              <img src={user?.profile_image || data?.user?.profile_image} alt="Profile" />
+            ) : (
+              <User size={24} />
+            )}
+          </div>
+          <div>
+            <h2>Hello, {user?.username || data?.user?.username || "Saver"}! 👋</h2>
+            <p>Save toward your target and watch your pet react.</p>
+          </div>
         </div>
         <div className="header-actions">
           <div className="streak-badge">

@@ -69,7 +69,7 @@ export function AuthProvider({ children }) {
   const updateUser = async (updates) => {
     let payload = typeof updates === "function" ? updates(user) : updates;
 
-    const apiFields = ["username", "email", "public_profile", "show_on_leaderboard"];
+    const apiFields = ["username", "email", "profile_image", "bio", "public_profile", "show_on_leaderboard"];
     const hasApiField = Object.keys(payload || {}).some(key => apiFields.includes(key));
 
     let responseData = {};
