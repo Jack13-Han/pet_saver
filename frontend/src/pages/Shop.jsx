@@ -14,6 +14,7 @@ export default function Shop() {
   const [purchasing, setPurchasing] = useState(null)
   const [previewItem, setPreviewItem] = useState(null)
   const [notice, setNotice] = useState(null)
+  const [confirmItem, setConfirmItem] = useState(null)
   const { user, updateUser } = useAuth()
 
   useEffect(() => { loadData() }, [])
@@ -44,14 +45,17 @@ export default function Shop() {
     }
     setPurchasing(item.id)
     try {
-      await shopApi.buy(item.id)
-      updateUser({ coins: user.coins - item.price })
+      const response = await shopApi.buy(item.id)
+      const remainingCoins = Number(response.data?.coins)
+      if (!Number.isFinite(remainingCoins)) throw new Error('Updated coin balance was not returned')
+      await updateUser({ coins: remainingCoins })
       setNotice({
         type: 'success',
         title: 'Congratulations!',
         message: `You've unlocked a new avatar: ${item.name}.`,
       })
       await loadData()
+      setConfirmItem(null)
     } catch (err) {
       setNotice({
         type: 'error',
@@ -118,7 +122,7 @@ export default function Shop() {
         <AnimatePresence>
           {avatarItems.map((item, i) => (
             <motion.div key={item.id} className={`shop-item ${item.owned ? 'owned' : ''}`}
-              initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }} onClick={() => handleBuy(item)}>
+              initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}>
               {item.owned && <div className="shop-item-owned-badge">Owned</div>}
               <span className="shop-item-icon">{getItemIcon(item)}</span>
               <div className="shop-item-name">{item.name}</div>
@@ -136,7 +140,8 @@ export default function Shop() {
               </button>
               {!item.owned && (
                 <button className="btn btn-primary" style={{ marginTop: 12, padding: '8px 16px', fontSize: 13, width: '100%' }}
-                  disabled={purchasing === item.id}>
+                  onClick={() => setConfirmItem(item)}
+                  disabled={purchasing === item.id || user?.coins < item.price}>
                   {purchasing === item.id ? 'Buying...' : user?.coins < item.price ? <><Lock size={14} /> Need coins</> : 'Buy'}
                 </button>
               )}
@@ -178,6 +183,61 @@ export default function Shop() {
               </div>
               <p>This is how the avatar moves on Home.</p>
               <div className="shop-preview-price">🪙 {previewItem.price} Coins</div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {confirmItem && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => purchasing === null && setConfirmItem(null)}
+          >
+            <motion.div
+              className="shop-purchase-modal"
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 20 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="shop-preview-close"
+                onClick={() => setConfirmItem(null)}
+                disabled={purchasing !== null}
+                aria-label="Cancel purchase"
+              >
+                <X size={18} />
+              </button>
+              <div className="shop-purchase-icon">{getItemIcon(confirmItem)}</div>
+              <h3>Confirm Purchase</h3>
+              <p>Are you sure you want to unlock <strong>{confirmItem.name}</strong>?</p>
+              <div className="shop-purchase-summary">
+                <div><span>Price</span><strong><Coins size={16} /> {confirmItem.price}</strong></div>
+                <div><span>Balance after purchase</span><strong>{Math.max(0, Number(user?.coins || 0) - Number(confirmItem.price || 0))} Coins</strong></div>
+              </div>
+              <div className="shop-purchase-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setConfirmItem(null)}
+                  disabled={purchasing !== null}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => handleBuy(confirmItem)}
+                  disabled={purchasing !== null}
+                >
+                  {purchasing === confirmItem.id ? 'Buying...' : 'Confirm Purchase'}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

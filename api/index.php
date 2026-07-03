@@ -1034,13 +1034,30 @@ if ($path === 'shop/buy' && $method === 'POST') {
     $userCoins = $stmt->fetchColumn();
     if ($userCoins < $item['price']) errorResponse('Not enough coins');
 
-    $pdo->beginTransaction();
-    $pdo->prepare("UPDATE users SET coins = coins - ? WHERE id = ?")->execute([$item['price'], $userId]);
-    $pdo->prepare("INSERT INTO inventory (user_id, accessory_id, target_id) VALUES (?, ?, ?)")->execute([$userId, $accessoryId, $targetId ?: null]);
-    $pdo->prepare("UPDATE achievements SET progress = progress + 1 WHERE user_id = ? AND title = 'Shopaholic'")->execute([$userId]);
-    checkAchievements($pdo, $userId);
-    $pdo->commit();
-    successResponse(null, 'Purchase successful!');
+    try {
+        $pdo->beginTransaction();
+
+        $deduct = $pdo->prepare("UPDATE users SET coins = coins - ? WHERE id = ? AND coins >= ?");
+        $deduct->execute([$item['price'], $userId, $item['price']]);
+        if ($deduct->rowCount() !== 1) {
+            $pdo->rollBack();
+            errorResponse('Not enough coins');
+        }
+
+        $pdo->prepare("INSERT INTO inventory (user_id, accessory_id, target_id) VALUES (?, ?, ?)")->execute([$userId, $accessoryId, $targetId ?: null]);
+        $pdo->prepare("UPDATE achievements SET progress = progress + 1 WHERE user_id = ? AND title = 'Shopaholic'")->execute([$userId]);
+        checkAchievements($pdo, $userId);
+
+        $balanceStmt = $pdo->prepare("SELECT coins FROM users WHERE id = ?");
+        $balanceStmt->execute([$userId]);
+        $remainingCoins = (int)$balanceStmt->fetchColumn();
+
+        $pdo->commit();
+        successResponse(['coins' => $remainingCoins], 'Purchase successful!');
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        errorResponse('Purchase failed', 500);
+    }
 }
 
 if ($path === 'inventory' && $method === 'GET') {
@@ -1188,7 +1205,8 @@ if ($path === 'finance/overview' && $method === 'GET') {
 }
 
 if ($path === 'finance/weekly-report' && $method === 'GET') {
-    successResponse(getWeeklyFinanceReport($pdo, $userId));
+    $language = $_GET['language'] ?? 'en';
+    successResponse(getWeeklyFinanceReport($pdo, $userId, $language));
 }
 
 if ($path === 'finance/export' && $method === 'GET') {
@@ -2337,7 +2355,7 @@ function checkAchievements($pdo, $userId)
     ")->execute([$userId]);
 }
 
-function getWeeklyFinanceReport($pdo, $userId) {
+function getWeeklyFinanceReport($pdo, $userId, $language = 'en') {
     $sevenDaysAgo = date('Y-m-d', strtotime('-7 days'));
     $today = date('Y-m-d');
     
@@ -2407,17 +2425,44 @@ function getWeeklyFinanceReport($pdo, $userId) {
         $apiKey = GEMINI_API_KEY;
     }
 
-    if ($apiKey === '') {
-        return [
-            'report' => "Weekly analysis report generation failed: Gemini API key is missing."
-        ];
-    }
-
     $petName = $activeTarget ? $activeTarget['avatar_name'] : 'Mochi';
     $petType = $activeTarget ? $activeTarget['avatar_type'] : 'dog';
     $targetName = $activeTarget ? $activeTarget['name'] : 'None';
-    $targetAmount = $activeTarget ? $activeTarget['target_amount'] : 0;
-    $currentAmount = $activeTarget ? $activeTarget['current_amount'] : 0;
+    $targetAmount = $activeTarget ? (float)$activeTarget['target_amount'] : 0;
+    $currentAmount = $activeTarget ? (float)$activeTarget['current_amount'] : 0;
+
+    if ($apiKey === '') {
+        $net = $weeklySavings - $weeklySpending;
+        $goalProgress = $targetAmount > 0 ? min(100, round(($currentAmount / $targetAmount) * 100)) : 0;
+        $nextStep = $weeklySpending > $weeklySavings
+            ? "Try reducing " . ($topCategory !== 'None' ? $topCategory : 'non-essential') . " spending next week and move the difference into savings."
+            : "Your savings are keeping pace with your spending. Keep the momentum going with one small deposit next week.";
+
+        return [
+            'report' => "## Weekly Summary\n"
+                . "- **Saved:** Yen " . number_format($weeklySavings) . "\n"
+                . "- **Spent:** Yen " . number_format($weeklySpending) . "\n"
+                . "- **Net:** " . ($net >= 0 ? "+" : "-") . "Yen " . number_format(abs($net)) . "\n"
+                . "- **Top spending category:** " . $topCategory . " (Yen " . number_format($topCategoryTotal) . ")\n\n"
+                . "## Goal Check\n"
+                . ($targetAmount > 0
+                    ? "- **" . $targetName . ":** " . $goalProgress . "% complete.\n"
+                    : "- No active savings goal yet. Create one to start tracking progress.\n")
+                . "- " . $petName . " is cheering you on!\n\n"
+                . "## Recommended Next Step\n"
+                . "- " . $nextStep,
+            'generated_by' => 'local'
+        ];
+    }
+
+    $reportLanguages = [
+        'en' => 'English',
+        'ja' => 'Japanese',
+        'my' => 'Burmese (Myanmar)',
+        'zh' => 'Simplified Chinese',
+        'ko' => 'Korean'
+    ];
+    $reportLanguage = $reportLanguages[$language] ?? 'English';
 
     $prompt = "You are a financial advisor and virtual companion pet coach. Analyze the user's transaction data for the past 7 days:
 - User total savings this week: Yen " . number_format($weeklySavings) . "
@@ -2427,7 +2472,7 @@ function getWeeklyFinanceReport($pdo, $userId) {
 - Virtual Pet Companion: " . $petName . " (Type: " . $petType . ")
 - Recent transactions list:\n" . ($txSummary ?: "No transactions recorded this week.") . "
 
-Provide a Weekly Financial Analysis Report in Burmese language. Keep it very engaging, friendly, and structured. 
+Provide a Weekly Financial Analysis Report in " . $reportLanguage . ". Keep it very engaging, friendly, and structured.
 Use bullet points, relevant emojis, and bold headers. 
 Mention the virtual pet by name (" . $petName . ") and describe how the user's spending/saving habits might impact the pet's feelings or goals (e.g., if savings are high, " . $petName . " is excited and happy; if spending is high or goal progress is stalled, suggest minor adjustments to cheer up " . $petName . ").
 Keep the total response under 250 words.";

@@ -608,21 +608,21 @@ export default function ExpenseAnalyst() {
         </div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
-            <div className="card">
-              <div style={{ color: 'var(--text-secondary)', fontWeight: 800, fontSize: 13 }}>{t.totalSpent}</div>
-              <div style={{ fontSize: 30, fontWeight: 900, color: '#EF4444', marginTop: 6 }}>{currency(analysis.total)}</div>
+          <div className="expense-summary-grid">
+            <div className="card expense-summary-card">
+              <div className="expense-summary-label">{t.totalSpent}</div>
+              <div className="expense-summary-total">{currency(analysis.total)}</div>
             </div>
-            <div className="card">
-              <div style={{ color: 'var(--text-secondary)', fontWeight: 800, fontSize: 13 }}>{t.topArea}</div>
-              <div style={{ fontSize: 24, fontWeight: 900, marginTop: 6 }}>{analysis.top.label}</div>
-              <div style={{ color: 'var(--text-muted)', fontWeight: 700, marginTop: 4 }}>{analysis.top.percent}% • {currency(analysis.top.amount)}</div>
+            <div className="card expense-summary-card">
+              <div className="expense-summary-label">{t.topArea}</div>
+              <div className="expense-summary-value">{analysis.top.label}</div>
+              <div className="expense-summary-meta">{analysis.top.percent}% • {currency(analysis.top.amount)}</div>
             </div>
-            <div className="card">
-              <div style={{ color: 'var(--text-secondary)', fontWeight: 800, fontSize: 13 }}>{t.riskLevel}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+            <div className="card expense-summary-card">
+              <div className="expense-summary-label">{t.riskLevel}</div>
+              <div className="expense-summary-risk">
                 <TrendingDown color={analysis.riskTone === 'high-risk' ? '#DC2626' : analysis.riskTone === 'risk' ? '#EA580C' : analysis.riskTone === 'review' ? '#B45309' : 'var(--accent-green)'} />
-                <span style={{ fontSize: 24, fontWeight: 900 }}>{analysis.risk}</span>
+                <span>{analysis.risk}</span>
               </div>
             </div>
           </div>
