@@ -32,7 +32,7 @@ export default function Shop() {
     finally { setLoading(false) }
   }
 
-  const handleBuy = async (item) => {
+  const handleBuy = (item) => {
     if (purchasing) return
     if (item.owned) return
     if ((user?.coins || 0) < item.price) {
@@ -43,6 +43,12 @@ export default function Shop() {
       })
       return
     }
+    setConfirmItem(item)
+  }
+
+  const confirmPurchase = async () => {
+    if (!confirmItem || purchasing) return
+    const item = confirmItem
     setPurchasing(item.id)
     try {
       const response = await shopApi.buy(item.id)
@@ -101,6 +107,55 @@ export default function Shop() {
               <div className="shop-notification-copy">
                 <h3>{notice.title}</h3>
                 <p>{notice.message}</p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {confirmItem && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setConfirmItem(null)}
+          >
+            <motion.div
+              className="delete-confirm-modal"
+              initial={{ scale: 0.92, y: 24 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.92, y: 24 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="delete-confirm-box">
+                <button className="modal-close delete-confirm-close" onClick={() => setConfirmItem(null)} aria-label="Close">
+                  <X size={18} />
+                </button>
+                <div style={{ fontSize: 46, marginBottom: 8 }}>{getItemIcon(confirmItem)}</div>
+                <h3>Buy this item?</h3>
+                <p>
+                  {confirmItem.name} costs {Number(confirmItem.price || 0).toLocaleString()} coins.
+                </p>
+                <div className="delete-confirm-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setConfirmItem(null)}
+                    disabled={purchasing === confirmItem.id}
+                  >
+                    No
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={confirmPurchase}
+                    disabled={purchasing === confirmItem.id}
+                  >
+                    {purchasing === confirmItem.id ? 'Buying...' : 'Yes'}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>

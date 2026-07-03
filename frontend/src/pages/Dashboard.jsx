@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import Lottie from "lottie-react";
 import {
   Edit3,
   Plus,
@@ -22,6 +23,7 @@ import {
   CheckCircle2,
   BookOpen,
   ArrowRight,
+  User,
 } from "lucide-react";
 import {
   dashboard as dashboardApi,
@@ -30,11 +32,15 @@ import {
   avatars as avatarApi,
   user as userApi,
   targets as targetApi,
+  calendar as calendarApi,
+  shop as shopApi,
 } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useLanguage } from "../i18n.jsx";
 import { realOCR } from "./ReceiptScanner.jsx";
 import { avatarEmojis, avatarTypes, getPetImageForTarget } from "../petAssets.js";
+import shibaSadAnimation from "../assets/lottie/shiba-sad.json";
+import shoppingAnimation from "../assets/lottie/shopping.json";
 
 const moodEmojis = {
   happy: "😊",
@@ -135,6 +141,9 @@ export default function Dashboard() {
   const [transactionNote, setTransactionNote] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const [deletingExpiredGoal, setDeletingExpiredGoal] = useState(false);
+  const [shopConfirmItem, setShopConfirmItem] = useState(null);
+  const [buyingShopItemId, setBuyingShopItemId] = useState(null);
+  const [shopNotice, setShopNotice] = useState(null);
   const fileInputRef = useRef(null);
   const { user, updateUser } = useAuth();
   const { language } = useLanguage();
@@ -204,7 +213,7 @@ export default function Dashboard() {
     ? Math.max(100, Math.min(500, Math.ceil(targetRemaining / 10)))
     : 100;
   const petMood = getMoodFromProgress(progress);
-  const shopPreview = (data?.shopPreview || []).filter(item => !['glasses', 'scarf'].includes(item.category));
+  const shopPreview = (data?.shopPreview || []).filter(item => item.category === "avatar" && item.avatar_type);
   const achievementsPreview = data?.achievements?.slice(0, 4) || [];
   const getShopPreviewIcon = (item) => {
     if (item.avatar_type) return avatarTypes.find(type => type.id === item.avatar_type)?.emoji || item.icon;
@@ -245,6 +254,12 @@ export default function Dashboard() {
     loadDashboard();
   }, []);
 
+  useEffect(() => {
+    if (!shopNotice) return undefined;
+    const timer = setTimeout(() => setShopNotice(null), 3600);
+    return () => clearTimeout(timer);
+  }, [shopNotice]);
+
   const loadDashboard = async () => {
     try {
       const dashboardRes = await dashboardApi.get();
@@ -260,6 +275,59 @@ export default function Dashboard() {
   const showToast = (message, type = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleShopPreviewClick = (item) => {
+    if (item.owned) {
+      showToast("You already own this item.");
+      return;
+    }
+
+    if (Number(user?.coins || data?.user?.coins || 0) < Number(item.price || 0)) {
+      setShopNotice({
+        type: "error",
+        title: "Not enough coins",
+        message: `You need ${Number(item.price || 0).toLocaleString()} coins to unlock ${item.name}.`,
+      });
+      return;
+    }
+
+    setShopConfirmItem(item);
+  };
+
+  const confirmShopPurchase = async () => {
+    if (!shopConfirmItem || buyingShopItemId) return;
+
+    const item = shopConfirmItem;
+    setBuyingShopItemId(item.id);
+    try {
+      await shopApi.buy(item.id);
+      const nextCoins = Math.max(0, Number(user?.coins || data?.user?.coins || 0) - Number(item.price || 0));
+
+      updateUser({ coins: nextCoins });
+      setData((prev) => ({
+        ...prev,
+        user: { ...prev.user, coins: nextCoins },
+        shopPreview: (prev.shopPreview || []).map((previewItem) => (
+          previewItem.id === item.id ? { ...previewItem, owned: true } : previewItem
+        )),
+      }));
+      setShopConfirmItem(null);
+      setShopNotice({
+        type: "success",
+        title: "Congratulations!",
+        message: `You've unlocked a new avatar: ${item.name}.`,
+      });
+      loadDashboard();
+    } catch (err) {
+      setShopNotice({
+        type: "error",
+        title: err.message === "Not enough coins" ? "Not enough coins" : "Purchase failed",
+        message: err.message || "Please try again.",
+      });
+    } finally {
+      setBuyingShopItemId(null);
+    }
   };
 
   const showPetReaction = (reaction) => {
@@ -467,6 +535,86 @@ export default function Dashboard() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {shopNotice && (
+          <motion.div
+            className="shop-notification-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShopNotice(null)}
+          >
+            <motion.div
+              className={`shop-notification ${shopNotice.type}`}
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 18, scale: 0.96 }}
+              transition={{ duration: 0.22 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <Lottie
+                animationData={shopNotice.type === "success" ? shoppingAnimation : shibaSadAnimation}
+                loop={shopNotice.type !== "success"}
+                className="shop-notification-animation"
+              />
+              <div className="shop-notification-copy">
+                <h3>{shopNotice.title}</h3>
+                <p>{shopNotice.message}</p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {shopConfirmItem && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShopConfirmItem(null)}
+          >
+            <motion.div
+              className="delete-confirm-modal"
+              initial={{ scale: 0.92, y: 24 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.92, y: 24 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="delete-confirm-box">
+                <button className="modal-close delete-confirm-close" onClick={() => setShopConfirmItem(null)} aria-label="Close">
+                  <X size={18} />
+                </button>
+                <div style={{ fontSize: 46, marginBottom: 8 }}>{getShopPreviewIcon(shopConfirmItem)}</div>
+                <h3>Buy this item?</h3>
+                <p>
+                  {shopConfirmItem.name} costs {Number(shopConfirmItem.price || 0).toLocaleString()} coins.
+                </p>
+                <div className="delete-confirm-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShopConfirmItem(null)}
+                    disabled={buyingShopItemId === shopConfirmItem.id}
+                  >
+                    No
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={confirmShopPurchase}
+                    disabled={buyingShopItemId === shopConfirmItem.id}
+                  >
+                    {buyingShopItemId === shopConfirmItem.id ? "Buying..." : "Yes"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {showTutorial && (
           <motion.div
             className="tutorial-overlay"
@@ -599,9 +747,18 @@ export default function Dashboard() {
       </AnimatePresence>
 
       <div className="page-header">
-        <div className="page-title">
-          <h2>Hello, {user?.username || data?.user?.username || "Saver"}! 👋</h2>
-          <p>Save toward your target and watch your pet react.</p>
+        <div className="page-title home-title-with-profile">
+          <div className="home-profile-avatar">
+            {user?.profile_image || data?.user?.profile_image ? (
+              <img src={user?.profile_image || data?.user?.profile_image} alt="Profile" />
+            ) : (
+              <User size={24} />
+            )}
+          </div>
+          <div>
+            <h2>Hello, {user?.username || data?.user?.username || "Saver"}! 👋</h2>
+            <p>Save toward your target and watch your pet react.</p>
+          </div>
         </div>
         <div className="header-actions">
           <div className="streak-badge">
@@ -1644,7 +1801,17 @@ export default function Dashboard() {
               style={{ gridTemplateColumns: "repeat(2, 1fr)" }}
             >
               {shopPreview.map((item) => (
-                <div key={item.id} className="shop-item">
+                <div
+                  key={item.id}
+                  className={`shop-item ${item.owned ? "owned" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleShopPreviewClick(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") handleShopPreviewClick(item);
+                  }}
+                >
+                  {item.owned && <div className="shop-item-owned-badge">Owned</div>}
                   <span className="shop-item-icon">{getShopPreviewIcon(item)}</span>
                   <div className="shop-item-name">{item.name}</div>
                   <div className="shop-item-price">🪙 {item.price}</div>

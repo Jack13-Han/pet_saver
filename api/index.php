@@ -114,7 +114,7 @@ set_exception_handler(function (Throwable $e) use ($pdo) {
     exit();
 });
 
-ensureUserPrivacyColumns($pdo);
+ensureUserProfileColumns($pdo);
 ensureFinanceFeatureTables($pdo);
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -227,6 +227,8 @@ if ($path === 'user' && $method === 'GET') {
         streak_days,
         total_saved,
         total_targets_completed,
+        COALESCE(profile_image, '') AS profile_image,
+        COALESCE(bio, '') AS bio,
         COALESCE(public_profile, 0) AS public_profile,
         COALESCE(show_on_leaderboard, 1) AS show_on_leaderboard
     FROM users
@@ -258,6 +260,28 @@ if ($path === 'user' && $method === 'PUT') {
         $params[] = $email;
     }
 
+    if (array_key_exists('profile_image', $input)) {
+        $profileImage = trim($input['profile_image'] ?? '');
+        if ($profileImage !== '' && !preg_match('/^data:image\/(jpeg|jpg|png|webp);base64,/i', $profileImage)) {
+            errorResponse('Invalid profile image');
+        }
+        if (strlen($profileImage) > 1200000) {
+            errorResponse('Profile image is too large');
+        }
+        $updates[] = 'profile_image = ?';
+        $params[] = $profileImage;
+    }
+
+    if (array_key_exists('bio', $input)) {
+        $bio = trim($input['bio'] ?? '');
+        $bioLength = function_exists('mb_strlen') ? mb_strlen($bio) : strlen($bio);
+        if ($bioLength > 280) {
+            errorResponse('Bio must be 280 characters or less');
+        }
+        $updates[] = 'bio = ?';
+        $params[] = $bio;
+    }
+
     if (array_key_exists('public_profile', $input)) {
         $updates[] = 'public_profile = ?';
         $params[] = !empty($input['public_profile']) ? 1 : 0;
@@ -286,6 +310,8 @@ if ($path === 'user' && $method === 'PUT') {
             streak_days,
             total_saved,
             total_targets_completed,
+            COALESCE(profile_image, '') AS profile_image,
+            COALESCE(bio, '') AS bio,
             COALESCE(public_profile, 0) AS public_profile,
             COALESCE(show_on_leaderboard, 1) AS show_on_leaderboard
         FROM users
@@ -1141,7 +1167,7 @@ if ($path === 'receipts' && $method === 'GET') {
 }
 
 if ($path === 'rankings' && $method === 'GET') {
-    $stmt = $pdo->query("SELECT id, username, `rank`, total_targets_completed, total_saved, coins, CASE WHEN `rank` = 'Platinum' THEN 5 WHEN `rank` = 'Diamond' THEN 4 WHEN `rank` = 'Gold' THEN 3 WHEN `rank` = 'Silver' THEN 2 ELSE 1 END as rank_value FROM users WHERE COALESCE(show_on_leaderboard, 1) = 1 ORDER BY rank_value DESC, total_targets_completed DESC, total_saved DESC LIMIT 50");
+    $stmt = $pdo->query("SELECT id, username, COALESCE(profile_image, '') AS profile_image, `rank`, total_targets_completed, total_saved, coins, CASE WHEN `rank` = 'Platinum' THEN 5 WHEN `rank` = 'Diamond' THEN 4 WHEN `rank` = 'Gold' THEN 3 WHEN `rank` = 'Silver' THEN 2 ELSE 1 END as rank_value FROM users WHERE COALESCE(show_on_leaderboard, 1) = 1 ORDER BY rank_value DESC, total_targets_completed DESC, total_saved DESC LIMIT 50");
     successResponse($stmt->fetchAll());
 }
 
@@ -1879,10 +1905,10 @@ function finalizeReachedTargets($pdo, $userId)
     ")->execute([$userId]);
 }
 
-function ensureUserPrivacyColumns($pdo)
+function ensureUserProfileColumns($pdo)
 {
     try {
-        $pdo->query("SELECT public_profile, show_on_leaderboard FROM users LIMIT 1");
+        $pdo->query("SELECT public_profile, show_on_leaderboard, profile_image, bio FROM users LIMIT 1");
     } catch (PDOException $e) {
         try {
             $pdo->exec("ALTER TABLE users ADD COLUMN public_profile TINYINT(1) NOT NULL DEFAULT 0");
@@ -1891,6 +1917,16 @@ function ensureUserPrivacyColumns($pdo)
 
         try {
             $pdo->exec("ALTER TABLE users ADD COLUMN show_on_leaderboard TINYINT(1) NOT NULL DEFAULT 1");
+        } catch (PDOException $ignored) {
+        }
+
+        try {
+            $pdo->exec("ALTER TABLE users ADD COLUMN profile_image MEDIUMTEXT NULL");
+        } catch (PDOException $ignored) {
+        }
+
+        try {
+            $pdo->exec("ALTER TABLE users ADD COLUMN bio VARCHAR(280) NOT NULL DEFAULT ''");
         } catch (PDOException $ignored) {
         }
     }
