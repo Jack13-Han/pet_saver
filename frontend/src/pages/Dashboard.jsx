@@ -33,6 +33,7 @@ import {
   user as userApi,
   targets as targetApi,
   calendar as calendarApi,
+  shop as shopApi,
 } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useLanguage } from "../i18n.jsx";
@@ -181,6 +182,8 @@ export default function Dashboard() {
   const [transactionNote, setTransactionNote] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const [deletingExpiredGoal, setDeletingExpiredGoal] = useState(false);
+  const [shopConfirmItem, setShopConfirmItem] = useState(null);
+  const [buyingShopItemId, setBuyingShopItemId] = useState(null);
   const fileInputRef = useRef(null);
   const { user, updateUser } = useAuth();
   const { language } = useLanguage();
@@ -592,6 +595,47 @@ export default function Dashboard() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const handleShopPreviewClick = (item) => {
+    if (item.owned) {
+      showToast("You already own this item.");
+      return;
+    }
+
+    if (Number(user?.coins || data?.user?.coins || 0) < Number(item.price || 0)) {
+      showToast("Not enough coin", "error");
+      return;
+    }
+
+    setShopConfirmItem(item);
+  };
+
+  const confirmShopPurchase = async () => {
+    if (!shopConfirmItem || buyingShopItemId) return;
+
+    const item = shopConfirmItem;
+    setBuyingShopItemId(item.id);
+    try {
+      await shopApi.buy(item.id);
+      const nextCoins = Math.max(0, Number(user?.coins || data?.user?.coins || 0) - Number(item.price || 0));
+
+      updateUser({ coins: nextCoins });
+      setData((prev) => ({
+        ...prev,
+        user: { ...prev.user, coins: nextCoins },
+        shopPreview: (prev.shopPreview || []).map((previewItem) => (
+          previewItem.id === item.id ? { ...previewItem, owned: true } : previewItem
+        )),
+      }));
+      setShopConfirmItem(null);
+      showToast(`${item.name} purchased!`);
+      loadDashboard();
+    } catch (err) {
+      showToast(err.message || "Purchase failed", "error");
+    } finally {
+      setBuyingShopItemId(null);
+    }
+  };
+
   const showPetReaction = (reaction) => {
     if (!reaction) return;
     setPetReaction(reaction);
@@ -798,6 +842,55 @@ export default function Dashboard() {
             exit={{ x: 100, opacity: 0 }}
           >
             {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {shopConfirmItem && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShopConfirmItem(null)}
+          >
+            <motion.div
+              className="delete-confirm-modal"
+              initial={{ scale: 0.92, y: 24 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.92, y: 24 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="delete-confirm-box">
+                <button className="modal-close delete-confirm-close" onClick={() => setShopConfirmItem(null)} aria-label="Close">
+                  <X size={18} />
+                </button>
+                <div style={{ fontSize: 46, marginBottom: 8 }}>{getShopPreviewIcon(shopConfirmItem)}</div>
+                <h3>Buy this item?</h3>
+                <p>
+                  {shopConfirmItem.name} costs {Number(shopConfirmItem.price || 0).toLocaleString()} coins.
+                </p>
+                <div className="delete-confirm-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setShopConfirmItem(null)}
+                    disabled={buyingShopItemId === shopConfirmItem.id}
+                  >
+                    No
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={confirmShopPurchase}
+                    disabled={buyingShopItemId === shopConfirmItem.id}
+                  >
+                    {buyingShopItemId === shopConfirmItem.id ? "Buying..." : "Yes"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -2377,7 +2470,17 @@ export default function Dashboard() {
               style={{ gridTemplateColumns: "repeat(2, 1fr)" }}
             >
               {shopPreview.map((item) => (
-                <div key={item.id} className="shop-item">
+                <div
+                  key={item.id}
+                  className={`shop-item ${item.owned ? "owned" : ""}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleShopPreviewClick(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") handleShopPreviewClick(item);
+                  }}
+                >
+                  {item.owned && <div className="shop-item-owned-badge">Owned</div>}
                   <span className="shop-item-icon">{getShopPreviewIcon(item)}</span>
                   <div className="shop-item-name">{item.name}</div>
                   <div className="shop-item-price">🪙 {item.price}</div>
