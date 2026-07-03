@@ -3847,6 +3847,22 @@ select.form-input {
   margin-top: 16px;
 }
 
+.settings-password-form {
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-password-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 /* RESPONSIVE */
 @media (max-width: 1024px) {
   .mobile-header {

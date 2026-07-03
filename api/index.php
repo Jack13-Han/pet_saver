@@ -322,6 +322,20 @@ if ($path === 'user' && $method === 'PUT') {
     successResponse($stmt->fetch(), 'Settings updated');
 }
 
+if ($path === 'user/password' && $method === 'PUT') {
+    $newPassword = $input['new_password'] ?? '';
+
+    if (strlen($newPassword) < 6) {
+        errorResponse('New password must be at least 6 characters');
+    }
+
+    $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
+    $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+    $stmt->execute([$newHash, $userId]);
+
+    successResponse(null, 'Password updated');
+}
+
 if ($path === 'user/active-target' && $method === 'POST') {
 
     $targetId = intval($input['target_id'] ?? 0);
