@@ -251,7 +251,11 @@ export default function Dashboard() {
     : 1500;
   const petMood = getMoodFromProgress(progress);
   const shopPreview = (data?.shopPreview || []).filter(item => !['glasses', 'scarf'].includes(item.category));
-  const achievementsPreview = data?.achievements?.slice(0, 4) || [];
+  const achievementsPreview = (data?.achievements || []).filter((ach) => ach.is_unlocked);
+  const calendarHeaderLabel = startOfMonth(new Date()).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
   const getShopPreviewIcon = (item) => {
     if (item.avatar_type) return avatarTypes.find(type => type.id === item.avatar_type)?.emoji || item.icon;
     return item.icon;
@@ -1314,7 +1318,7 @@ export default function Dashboard() {
                   <ChevronLeft size={18} />
                 </button>
                 <h4 className="finance-calendar-month-title">
-                  {selectedCalendarMonth?.label}
+                  {calendarHeaderLabel}
                 </h4>
                 <button
                   type="button"
@@ -2426,7 +2430,7 @@ export default function Dashboard() {
               ))}
               {achievementsPreview.length === 0 && (
                 <div className="side-achievement-empty">
-                  Complete quests and saving goals to unlock achievements.
+                  No unlocked achievements yet.
                 </div>
               )}
             </div>
