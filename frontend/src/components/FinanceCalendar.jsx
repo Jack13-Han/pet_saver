@@ -32,7 +32,7 @@ export default function FinanceCalendar({ onChanged }) {
       calendarApi.get(),
       txApi.list(),
     ]);
-    setCalendarData((calendarRes.data || []).map((item) => ({
+    setCalendarData((calendarRes.data?.days || []).map((item) => ({
       day: item.day,
       income: Number(item.income || 0),
       expense: Number(item.expense || 0),
