@@ -75,6 +75,7 @@ export const auth = {
 export const user = {
   get: () => api("user"),
   update: (data) => api("user", { method: "PUT", body: data }),
+  changePassword: (data) => api("user/password", { method: "PUT", body: data }),
 
   setActiveTarget: (targetId) =>
     api("user/active-target", {

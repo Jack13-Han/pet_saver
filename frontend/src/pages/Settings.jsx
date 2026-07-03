@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { User, Bell, Shield, Palette, LogOut, Save, Camera, Trash2 } from 'lucide-react'
+import { user as userApi } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useLanguage } from '../i18n.jsx'
 
@@ -20,6 +21,12 @@ export default function Settings() {
     share_achievements: true,
   })
   const [saving, setSaving] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [showPasswordForm, setShowPasswordForm] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({
+    new_password: '',
+    confirm_password: '',
+  })
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark')
   const profileInputRef = useRef(null)
 
@@ -99,6 +106,35 @@ export default function Settings() {
       console.error(err)
       setPrivacy(previous)
       alert(err.message || 'Failed to save privacy setting')
+    }
+  }
+
+  const handlePasswordChange = async (event) => {
+    event.preventDefault()
+
+    if (passwordForm.new_password.length < 6) {
+      alert('New password must be at least 6 characters')
+      return
+    }
+
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      alert('New passwords do not match')
+      return
+    }
+
+    setSavingPassword(true)
+    try {
+      await userApi.changePassword({
+        new_password: passwordForm.new_password,
+      })
+      setPasswordForm({ new_password: '', confirm_password: '' })
+      setShowPasswordForm(false)
+      alert('Password changed!')
+    } catch (err) {
+      console.error(err)
+      alert(err.message || 'Failed to change password')
+    } finally {
+      setSavingPassword(false)
     }
   }
 
@@ -255,8 +291,54 @@ export default function Settings() {
                   </div>
                 ))}
                 <div className="settings-danger-action">
-                  <button className="btn btn-danger"><Shield size={18} /> Change Password</button>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={() => setShowPasswordForm(prev => !prev)}
+                  >
+                    <Shield size={18} /> Change Password
+                  </button>
                 </div>
+                {showPasswordForm && (
+                  <form className="settings-password-form" onSubmit={handlePasswordChange}>
+                    <div className="form-group">
+                      <label>New Password</label>
+                      <input
+                        className="form-input"
+                        type="password"
+                        value={passwordForm.new_password}
+                        onChange={e => setPasswordForm({...passwordForm, new_password: e.target.value})}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Confirm New Password</label>
+                      <input
+                        className="form-input"
+                        type="password"
+                        value={passwordForm.confirm_password}
+                        onChange={e => setPasswordForm({...passwordForm, confirm_password: e.target.value})}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                    <div className="settings-password-actions">
+                      <button type="submit" className="btn btn-primary" disabled={savingPassword}>
+                        <Save size={18} /> {savingPassword ? 'Saving...' : 'Save Password'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        disabled={savingPassword}
+                        onClick={() => {
+                          setShowPasswordForm(false)
+                          setPasswordForm({ new_password: '', confirm_password: '' })
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             </div>
           )}
