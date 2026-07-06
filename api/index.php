@@ -198,9 +198,33 @@ if ($path === 'auth/login' && $method === 'POST') {
     ]);
 }
 
+if ($path === 'auth/change-password' && $method === 'POST') {
+    $username = trim($input['username'] ?? '');
+    $currentPassword = $input['current_password'] ?? '';
+    $newPassword = $input['new_password'] ?? '';
+
+    if (strlen($username) < 3 || strlen($currentPassword) < 6 || strlen($newPassword) < 6) {
+        errorResponse('Username, current password, and new password of at least 6 characters are required');
+    }
+
+    $stmt = $pdo->prepare("SELECT id, password_hash FROM users WHERE username = ?");
+    $stmt->execute([$username]);
+    $targetUser = $stmt->fetch();
+
+    if (!$targetUser || !password_verify($currentPassword, $targetUser['password_hash'])) {
+        errorResponse('Invalid credentials', 401);
+    }
+
+    $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
+    $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+    $stmt->execute([$newHash, $targetUser['id']]);
+
+    successResponse(null, 'Password updated');
+}
+
 // PROTECTED ROUTES
 $user = getAuthUser();
-if (!$user && !in_array($path, ['auth/login', 'auth/register'])) {
+if (!$user && !in_array($path, ['auth/login', 'auth/register', 'auth/change-password'])) {
     errorResponse('Unauthorized', 401);
 }
 $userId = $user['sub'] ?? null;
@@ -320,6 +344,20 @@ if ($path === 'user' && $method === 'PUT') {
     $stmt->execute([$userId]);
 
     successResponse($stmt->fetch(), 'Settings updated');
+}
+
+if ($path === 'user/password' && $method === 'PUT') {
+    $newPassword = $input['new_password'] ?? '';
+
+    if (strlen($newPassword) < 6) {
+        errorResponse('New password must be at least 6 characters');
+    }
+
+    $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
+    $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+    $stmt->execute([$newHash, $userId]);
+
+    successResponse(null, 'Password updated');
 }
 
 if ($path === 'user/active-target' && $method === 'POST') {
@@ -1084,6 +1122,45 @@ if ($path === 'shop/buy' && $method === 'POST') {
         if ($pdo->inTransaction()) $pdo->rollBack();
         errorResponse('Purchase failed', 500);
     }
+}
+
+if ($path === 'shop/sell' && $method === 'POST') {
+    ensureAvatarShopItems($pdo);
+    $accessoryId = intval($input['accessory_id'] ?? 0);
+
+    $stmt = $pdo->prepare("SELECT * FROM accessories WHERE id = ?");
+    $stmt->execute([$accessoryId]);
+    $item = $stmt->fetch();
+    if (!$item) errorResponse('Item not found');
+    if (!in_array($item['name'], avatarUnlockNames(), true)) {
+        errorResponse('This item cannot be sold');
+    }
+
+    $stmt = $pdo->prepare("SELECT id FROM inventory WHERE user_id = ? AND accessory_id = ? AND target_id IS NULL LIMIT 1");
+    $stmt->execute([$userId, $accessoryId]);
+    $inventoryItem = $stmt->fetch();
+    if (!$inventoryItem) errorResponse('Item not owned', 404);
+
+    $avatarType = avatarUnlockTypeForName($item['name']);
+    if ($avatarType) {
+        $stmt = $pdo->prepare("SELECT id FROM targets WHERE user_id = ? AND avatar_type = ? AND status = 'active' LIMIT 1");
+        $stmt->execute([$userId, $avatarType]);
+        if ($stmt->fetch()) {
+            errorResponse('This avatar is used by an active goal');
+        }
+    }
+
+    $refund = max(1, (int)floor(((int)$item['price']) / 2));
+
+    $pdo->beginTransaction();
+    $pdo->prepare("DELETE FROM inventory WHERE id = ? AND user_id = ?")->execute([$inventoryItem['id'], $userId]);
+    $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$refund, $userId]);
+    $stmt = $pdo->prepare("SELECT coins FROM users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $updatedCoins = (int)$stmt->fetchColumn();
+    $pdo->commit();
+
+    successResponse(['refund' => $refund, 'coins' => $updatedCoins], 'Item sold');
 }
 
 if ($path === 'inventory' && $method === 'GET') {
