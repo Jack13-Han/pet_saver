@@ -1125,8 +1125,13 @@ if ($path === 'receipts' && $method === 'POST') {
     $petReaction = null;
     $pdo->beginTransaction();
     try {
+        $imagePath = trim((string)($input['image_path'] ?? ''));
+        if ($imagePath === '' || str_starts_with($imagePath, 'data:image/') || strlen($imagePath) > 255) {
+            $imagePath = null;
+        }
+
         $pdo->prepare("INSERT INTO receipts (user_id, image_path, shop_name, total_price, receipt_date, category, items, target_id, is_processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)")
-            ->execute([$userId, $input['image_path'] ?? null, trim($input['shop_name'] ?? ''), $totalPrice, $input['date'] ?? date('Y-m-d'), $input['category'] ?? 'Shopping', json_encode($input['items'] ?? []), $targetId ?: null]);
+            ->execute([$userId, $imagePath, trim($input['shop_name'] ?? ''), $totalPrice, $input['date'] ?? date('Y-m-d'), $input['category'] ?? 'Shopping', json_encode($input['items'] ?? []), $targetId ?: null]);
         $receiptId = $pdo->lastInsertId();
 
         if ($totalPrice > 0) {
@@ -1462,14 +1467,19 @@ function scanReceiptWithGemini($image, $mimeType)
         errorResponse('Gemini API key is missing in api/.env or config.php', 500);
     }
 
-    if (!preg_match('/^image\/(jpeg|jpg|png|webp|heic|heif)$/i', $mimeType)) {
+    $mimeType = strtolower(trim($mimeType ?: 'image/jpeg'));
+    if ($mimeType === 'image/jpg') {
+        $mimeType = 'image/jpeg';
+    }
+
+    if (!preg_match('/^image\/(jpeg|png|webp|heic|heif)$/', $mimeType)) {
         errorResponse('Unsupported receipt image type');
     }
 
     $prompt = "Analyze this receipt image and return strict JSON only. "
         . "Extract the official store name, final total paid amount, and transaction date. "
         . "If the receipt is Japanese, keep the store name in Japanese. "
-        . "For the total, use the final paid amount only and return an integer. "
+        . "For the total, use the final paid amount only, ignoring change, tax-only rows, and subtotals. "
         . "For missing year, assume 2026. Date format must be YYYY-MM-DD. "
         . "JSON keys: shop_name, total_price, date.";
 
@@ -1492,7 +1502,16 @@ function scanReceiptWithGemini($image, $mimeType)
             ]
         ]],
         'generationConfig' => [
-            'responseMimeType' => 'application/json'
+            'responseMimeType' => 'application/json',
+            'responseSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'shop_name' => ['type' => 'string'],
+                    'total_price' => ['type' => 'string'],
+                    'date' => ['type' => 'string']
+                ],
+                'required' => ['shop_name', 'total_price', 'date']
+            ]
         ]
     ];
 
@@ -1507,19 +1526,58 @@ function scanReceiptWithGemini($image, $mimeType)
     }
 
     $decoded = json_decode($body, true);
-    $text = $decoded['candidates'][0]['content']['parts'][0]['text'] ?? '';
-    $text = trim(preg_replace('/^```json|```$/m', '', $text));
+    $text = trim($decoded['candidates'][0]['content']['parts'][0]['text'] ?? '');
+    $text = trim(preg_replace('/^```(?:json)?|```$/m', '', $text));
     $parsed = json_decode($text, true);
+
+    if (!is_array($parsed) && preg_match('/\{.*\}/s', $text, $matches)) {
+        $parsed = json_decode($matches[0], true);
+    }
 
     if (!is_array($parsed)) {
         errorResponse('Gemini returned unreadable receipt data', 500);
     }
 
+    $totalPrice = normalizeReceiptTotal($parsed['total_price'] ?? 0);
+    $receiptDate = normalizeReceiptDate($parsed['date'] ?? '');
+
     return [
         'shop_name' => trim($parsed['shop_name'] ?? 'Unknown Shop') ?: 'Unknown Shop',
-        'total_price' => max(0, (int)round((float)($parsed['total_price'] ?? 0))),
-        'date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $parsed['date'] ?? '') ? $parsed['date'] : date('Y-m-d')
+        'total_price' => $totalPrice,
+        'date' => $receiptDate
     ];
+}
+
+function normalizeReceiptTotal($value)
+{
+    if (is_numeric($value)) {
+        return max(0, (int)round((float)$value));
+    }
+
+    $cleaned = preg_replace('/[^\d.]/', '', (string)$value);
+    if ($cleaned === '' || !is_numeric($cleaned)) {
+        return 0;
+    }
+
+    return max(0, (int)round((float)$cleaned));
+}
+
+function normalizeReceiptDate($value)
+{
+    $value = trim((string)$value);
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+        return $value;
+    }
+
+    if (preg_match('/^(\d{4})[\/.](\d{1,2})[\/.](\d{1,2})$/', $value, $matches)) {
+        return sprintf('%04d-%02d-%02d', (int)$matches[1], (int)$matches[2], (int)$matches[3]);
+    }
+
+    if (preg_match('/^(\d{1,2})[\/.](\d{1,2})$/', $value, $matches)) {
+        return sprintf('2026-%02d-%02d', (int)$matches[1], (int)$matches[2]);
+    }
+
+    return date('Y-m-d');
 }
 
 function postJson($url, $payload)

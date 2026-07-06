@@ -3,28 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Upload, ScanLine, Check, X, Sparkles, FileText, Store, DollarSign, Calendar, Tag, Info, Receipt } from 'lucide-react'
 import { receipts as receiptApi, targets as targetApi } from '../api.js'
 
-// 1. Import Google Generative AI SDK
-
-// ⚠️ API Key configuration using Vite environment variables
-
-const genAI = {
-  getGenerativeModel: () => ({
-    generateContent: async ([, imagePart]) => {
-      const response = await receiptApi.scan({
-        image: imagePart.inlineData.data,
-        mime_type: imagePart.inlineData.mimeType,
-      })
-
-      return {
-        response: {
-          text: () => JSON.stringify(response.data || {}),
-        },
-      }
-    },
-  }),
-}
-
-// Helper function to convert file to Base64 format readable by Gemini
+// Convert the receipt image into the base64 shape expected by the backend scanner.
 const fileToGenerativePart = async (file) => {
   return new Promise((resolve) => {
     const reader = new FileReader();
@@ -40,79 +19,53 @@ const fileToGenerativePart = async (file) => {
   });
 };
 
-// Helper function to delay execution (useful for handling rate limits/high demand)
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const realOCR = async (file) => {
   const today = new Date().toISOString().split('T')[0];
   const imagePart = await fileToGenerativePart(file);
 
-  // Use Gemini API to parse the receipt image and extract structured data
-  const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.5-flash",
-    systemInstruction: "You are a professional financial auditor and highly accurate receipt parser. Analyze the provided image meticulously to extract information even if the image is slightly blurry or at an angle.",
-    generationConfig: { 
-      responseMimeType: "application/json",
-      // Enforce strict response schema for reliable parsing
-      responseSchema: {
-        type: "object",
-        properties: {
-          shop_name: { type: "string", description: "Name of the shop or company" },
-          total_price: { type: "integer", description: "The final total amount paid (numeric integer only)" },
-          date: { type: "string", description: "Transaction date in YYYY-MM-DD format" }
-        },
-        required: ["shop_name", "total_price", "date"]
-      }
-    }
-  });
-
-  const prompt = `
-    Analyze this receipt image step-by-step:
-    1. Identify the official store name or merchant name (If in Japanese, keep it in Japanese).
-    2. Scan for the final amount paid. Look for labels like "合計", "TOTAL", "小計", "Grand Total", "Bar", or the largest prominent number near the bottom.
-    3. Find the transaction date. If the year is missing or truncated, assume the current year is 2026. Format as YYYY-MM-DD.
-    
-    Ensure extreme accuracy for numbers and characters.
-  `;
-
   // Exponential Backoff Retry mechanism (up to 3 attempts) if server is overloaded
-  let maxRetries = 3;
-  let attempt = 0;
+  const maxRetries = 3;
 
-  while (attempt < maxRetries) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const response = await model.generateContent([prompt, imagePart]);
-      const resultText = response.response.text();
-      const aiParsed = JSON.parse(resultText);
+      const response = await receiptApi.scan({
+        image: imagePart.inlineData.data,
+        mime_type: imagePart.inlineData.mimeType,
+      });
+
+      const aiParsed = response.data || {};
+      const totalPrice = Number(aiParsed.total_price) || 0;
 
       return {
         shop_name: aiParsed.shop_name || 'Unknown Shop',
-        total_price: Number(aiParsed.total_price) || 0,
+        total_price: totalPrice,
         date: aiParsed.date || today,
         category: 'Shopping',
-        items: [{ name: 'お会計 / 合計', price: Number(aiParsed.total_price) || 0 }],
-        confidence: 100 
+        items: [{ name: 'Receipt total', price: totalPrice }],
+        confidence: totalPrice > 0 ? 100 : 65
       };
 
     } catch (err) {
-      attempt++;
-      console.warn(`Attempt ${attempt} failed. Error: ${err.message}`);
+      console.warn(`Receipt scan attempt ${attempt} failed: ${err.message}`);
       
       // If a 503 Overloaded Error or high demand occurs, wait briefly and retry
-      if ((err.message?.includes('503') || err.message?.includes('demand')) && attempt < maxRetries) {
-        await delay(attempt * 2000); // 1st try: 2s, 2nd try: 4s
+      const retryable = err.status === 503 || err.message?.includes('503') || err.message?.toLowerCase().includes('overloaded');
+      if (retryable && attempt < maxRetries) {
+        await delay(attempt * 2000);
         continue;
       }
 
       // If retries are exhausted, fallback to default parsing values
-      console.error("Gemini Image Parsing Final Error:", err);
+      console.error("Gemini receipt scan failed:", err);
       
       return {
         shop_name: 'Unknown Shop',
         total_price: 0,
         date: today,
         category: 'Shopping',
-        items: [{ name: 'お会計 / 合計', price: 0 }],
+        items: [{ name: 'Manual entry', price: 0 }],
         confidence: 31,
         scan_error: err.message || 'AI scan failed. Please enter the receipt details manually.'
       };
@@ -205,8 +158,7 @@ export default function ReceiptScanner() {
         date: result.date,
         category: result.category,
         items: result.items,
-        target_id: selectedTarget || null,
-        image_path: image
+        target_id: selectedTarget || null
       })
 
       setPetReaction(response.data?.pet_reaction || null)
@@ -415,7 +367,7 @@ export default function ReceiptScanner() {
                             setResult({
                               ...result, 
                               total_price: val,
-                              items: [{ name: 'お会計 / 合計', price: val }]
+                              items: [{ name: 'Receipt total', price: val }]
                             })
                           }} 
                           placeholder="e.g. 1500"
@@ -562,7 +514,7 @@ export default function ReceiptScanner() {
                   )}
                 </div>
                 <div style={{ fontWeight: 950, color: '#EF4444', whiteSpace: 'nowrap' }}>
-                  ﾂ･{Number(receipt.total_price || 0).toLocaleString()}
+                  ¥{Number(receipt.total_price || 0).toLocaleString()}
                 </div>
               </div>
             ))}
