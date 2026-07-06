@@ -137,6 +137,11 @@ export const shop = {
       method: "POST",
       body: { accessory_id: accessoryId, target_id: targetId },
     }),
+  sell: (accessoryId) =>
+    api("shop/sell", {
+      method: "POST",
+      body: { accessory_id: accessoryId },
+    }),
 };
 
 export const inventory = {

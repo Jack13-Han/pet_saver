@@ -12,9 +12,11 @@ export default function Shop() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [purchasing, setPurchasing] = useState(null)
+  const [selling, setSelling] = useState(null)
   const [notice, setNotice] = useState(null)
   const [previewItem, setPreviewItem] = useState(null)
   const [confirmItem, setConfirmItem] = useState(null)
+  const [sellConfirmItem, setSellConfirmItem] = useState(null)
   const { user, updateUser } = useAuth()
 
   useEffect(() => { loadData() }, [])
@@ -46,6 +48,12 @@ export default function Shop() {
     setConfirmItem(item)
   }
 
+  const handleSell = (item) => {
+    if (purchasing || selling) return
+    if (!item.owned) return
+    setSellConfirmItem(item)
+  }
+
   const confirmPurchase = async () => {
     if (!confirmItem || purchasing) return
     const item = confirmItem
@@ -68,6 +76,33 @@ export default function Shop() {
       })
     }
     finally { setPurchasing(null) }
+  }
+
+  const confirmSale = async () => {
+    if (!sellConfirmItem || selling) return
+    const item = sellConfirmItem
+    const estimatedRefund = Math.max(1, Math.floor(Number(item.price || 0) / 2))
+    setSelling(item.id)
+    try {
+      const res = await shopApi.sell(item.id)
+      const refund = Number(res.data?.refund ?? estimatedRefund)
+      const updatedCoins = Number(res.data?.coins ?? Number(user?.coins || 0) + refund)
+      updateUser({ coins: updatedCoins })
+      setSellConfirmItem(null)
+      setNotice({
+        type: 'success',
+        title: 'Avatar sold',
+        message: `You sold ${item.name} and received ${refund.toLocaleString()} coins.`,
+      })
+      await loadData()
+    } catch (err) {
+      setNotice({
+        type: 'error',
+        title: 'Sale failed',
+        message: err.message || 'Please try again.',
+      })
+    }
+    finally { setSelling(null) }
   }
 
   const avatarItems = items.filter(item => item.category === 'avatar' && item.avatar_type)
@@ -160,6 +195,55 @@ export default function Shop() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {sellConfirmItem && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSellConfirmItem(null)}
+          >
+            <motion.div
+              className="delete-confirm-modal"
+              initial={{ scale: 0.92, y: 24 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.92, y: 24 }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="delete-confirm-box">
+                <button className="modal-close delete-confirm-close" onClick={() => setSellConfirmItem(null)} aria-label="Close">
+                  <X size={18} />
+                </button>
+                <div style={{ fontSize: 46, marginBottom: 8 }}>{getItemIcon(sellConfirmItem)}</div>
+                <h3>Sell this avatar?</h3>
+                <p>
+                  You will receive {Math.max(1, Math.floor(Number(sellConfirmItem.price || 0) / 2)).toLocaleString()} coins.
+                </p>
+                <div className="delete-confirm-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setSellConfirmItem(null)}
+                    disabled={selling === sellConfirmItem.id}
+                  >
+                    No
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={confirmSale}
+                    disabled={selling === sellConfirmItem.id}
+                  >
+                    {selling === sellConfirmItem.id ? 'Selling...' : 'Sell'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="page-header">
         <div className="page-title">
           <h2>Shop 🛒</h2>
@@ -195,6 +279,20 @@ export default function Shop() {
                 <button className="btn btn-primary" style={{ marginTop: 12, padding: '8px 16px', fontSize: 13, width: '100%' }}
                   disabled={purchasing === item.id}>
                   {purchasing === item.id ? 'Buying...' : user?.coins < item.price ? <><Lock size={14} /> Need coins</> : 'Buy'}
+                </button>
+              )}
+              {item.owned && (
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  style={{ marginTop: 12, padding: '8px 16px', fontSize: 13, width: '100%' }}
+                  disabled={selling === item.id}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleSell(item)
+                  }}
+                >
+                  {selling === item.id ? 'Selling...' : `Sell +${Math.max(1, Math.floor(Number(item.price || 0) / 2))}`}
                 </button>
               )}
             </motion.div>
