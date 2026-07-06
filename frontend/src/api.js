@@ -70,6 +70,15 @@ export const auth = {
       method: "POST",
       body: { username, email, password },
     }),
+  changePassword: (username, currentPassword, newPassword) =>
+    api("auth/change-password", {
+      method: "POST",
+      body: {
+        username,
+        current_password: currentPassword,
+        new_password: newPassword,
+      },
+    }),
 };
 
 export const user = {

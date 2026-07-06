@@ -198,9 +198,33 @@ if ($path === 'auth/login' && $method === 'POST') {
     ]);
 }
 
+if ($path === 'auth/change-password' && $method === 'POST') {
+    $username = trim($input['username'] ?? '');
+    $currentPassword = $input['current_password'] ?? '';
+    $newPassword = $input['new_password'] ?? '';
+
+    if (strlen($username) < 3 || strlen($currentPassword) < 6 || strlen($newPassword) < 6) {
+        errorResponse('Username, current password, and new password of at least 6 characters are required');
+    }
+
+    $stmt = $pdo->prepare("SELECT id, password_hash FROM users WHERE username = ?");
+    $stmt->execute([$username]);
+    $targetUser = $stmt->fetch();
+
+    if (!$targetUser || !password_verify($currentPassword, $targetUser['password_hash'])) {
+        errorResponse('Invalid credentials', 401);
+    }
+
+    $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
+    $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+    $stmt->execute([$newHash, $targetUser['id']]);
+
+    successResponse(null, 'Password updated');
+}
+
 // PROTECTED ROUTES
 $user = getAuthUser();
-if (!$user && !in_array($path, ['auth/login', 'auth/register'])) {
+if (!$user && !in_array($path, ['auth/login', 'auth/register', 'auth/change-password'])) {
     errorResponse('Unauthorized', 401);
 }
 $userId = $user['sub'] ?? null;
