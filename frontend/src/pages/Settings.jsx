@@ -164,7 +164,7 @@ export default function Settings() {
               </button>
             ))}
           </div>
-          <button onClick={logout} className="settings-logout">
+          <button onClick={logout} className="settings-logout settings-logout-desktop">
             <LogOut size={18} /><span>Logout</span>
           </button>
         </nav>
@@ -245,6 +245,9 @@ export default function Settings() {
                 </div>
                 <button className="btn btn-primary settings-save" onClick={handleSave} disabled={saving}>
                   <Save size={18} /> {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+                <button type="button" onClick={logout} className="settings-logout settings-logout-mobile">
+                  <LogOut size={18} /><span>Logout</span>
                 </button>
               </div>
             </div>

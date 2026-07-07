@@ -350,7 +350,7 @@ export default function Goals() {
                   <div className="space-y-5">
                     <div className="space-y-3">
                       <label className="text-sm font-bold text-slate-500 block">Choose Your Companion 🐾</label>
-                      <div className="grid grid-cols-5 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                         {avatarTypes.map(type => {
                           const unlocked = isAvatarUnlocked(type)
                           const shopItem = avatarShopMap[type.id]
