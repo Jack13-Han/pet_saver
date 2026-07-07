@@ -3799,6 +3799,27 @@ select.form-input {
   transform: none;
 }
 
+.login-error-message,
+.login-success-message {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  padding: 10px 14px;
+  border-radius: 12px;
+}
+
+.login-error-message {
+  color: #ef4444;
+  background: #fee2e2;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.login-success-message {
+  color: #047857;
+  background: #d1fae5;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
 .login-toggle {
   text-align: center;
   margin-top: 20px;
@@ -3815,6 +3836,10 @@ select.form-input {
   cursor: pointer;
   font-family: inherit;
   font-size: 14px;
+}
+
+.login-password-toggle {
+  margin-top: 10px;
 }
 
 /* ANIMATIONS */
@@ -3907,11 +3932,16 @@ select.form-input {
 }
 
 .settings-nav {
+  min-height: calc(100vh - 48px);
   padding: 12px;
   border-radius: var(--radius-lg);
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 24px;
 }
 
 .settings-tabs {
@@ -3950,7 +3980,7 @@ select.form-input {
 }
 
 .settings-logout {
-  margin-top: 12px;
+  margin-top: auto;
   border-top: 1px solid var(--border-color);
   background: #fee2e2;
   color: #dc2626;
@@ -4107,6 +4137,22 @@ select.form-input {
 
 .settings-danger-action {
   margin-top: 16px;
+}
+
+.settings-password-form {
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-password-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 /* RESPONSIVE */
@@ -4342,10 +4388,14 @@ select.form-input {
   .settings-page .page-header {
     margin-bottom: 16px;
   }
+  .settings-page {
+    padding-bottom: 72px;
+  }
   .settings-layout {
     display: block;
   }
   .settings-nav {
+    min-height: 0;
     margin: 0 -12px 16px;
     padding: 8px 12px 10px;
     border-left: none;
@@ -4357,7 +4407,8 @@ select.form-input {
   }
   .settings-tabs {
     flex-direction: row;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    overflow: visible;
     gap: 6px;
     padding-bottom: 2px;
     scrollbar-width: none;
@@ -4367,16 +4418,24 @@ select.form-input {
   }
   .settings-tab {
     width: auto;
-    flex: 0 0 auto;
+    flex: 1 1 calc(50% - 6px);
+    justify-content: center;
     min-height: 40px;
     padding: 9px 12px;
     font-size: 14px;
   }
   .settings-logout {
-    width: auto;
+    width: calc(100% - 24px);
+    justify-content: center;
     min-height: 40px;
-    margin-top: 8px;
+    margin-top: 0;
     padding: 9px 12px;
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 30;
+    box-shadow: var(--shadow-md);
   }
   .settings-panel {
     width: 100%;

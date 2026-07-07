@@ -70,11 +70,21 @@ export const auth = {
       method: "POST",
       body: { username, email, password },
     }),
+  changePassword: (username, currentPassword, newPassword) =>
+    api("auth/change-password", {
+      method: "POST",
+      body: {
+        username,
+        current_password: currentPassword,
+        new_password: newPassword,
+      },
+    }),
 };
 
 export const user = {
   get: () => api("user"),
   update: (data) => api("user", { method: "PUT", body: data }),
+  changePassword: (data) => api("user/password", { method: "PUT", body: data }),
 
   setActiveTarget: (targetId) =>
     api("user/active-target", {
@@ -126,6 +136,11 @@ export const shop = {
     api("shop/buy", {
       method: "POST",
       body: { accessory_id: accessoryId, target_id: targetId },
+    }),
+  sell: (accessoryId) =>
+    api("shop/sell", {
+      method: "POST",
+      body: { accessory_id: accessoryId },
     }),
 };
 
