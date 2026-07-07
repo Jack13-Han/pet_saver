@@ -36,6 +36,7 @@ import {
   shop as shopApi,
 } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import FinanceCalendar from "../components/FinanceCalendar.jsx";
 import { useLanguage } from "../i18n.jsx";
 import { realOCR } from "./ReceiptScanner.jsx";
 import { avatarEmojis, avatarTypes, getPetImageForTarget } from "../petAssets.js";
@@ -1018,6 +1019,9 @@ export default function Dashboard() {
             </div>
           )}
 
+          <div style={{ marginTop: 24 }}>
+            <FinanceCalendar onChanged={loadDashboard} />
+          </div>
 
           {/* TRANSACTION INPUT */}
           {target && (

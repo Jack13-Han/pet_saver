@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { ArrowUpCircle, ArrowDownCircle, Calendar, Search, PieChart as PieChartIcon } from 'lucide-react'
 import { transactions as txApi } from '../api.js'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+import FinanceCalendar from '../components/FinanceCalendar.jsx'
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28DFF', '#FF6B6B'];
 
@@ -105,6 +106,10 @@ export default function Transactions() {
             <input className="form-input" style={{ paddingLeft: 40, width: '100%' }} placeholder="Search transactions..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <FinanceCalendar onChanged={loadData} />
       </div>
 
       {/* Charts Section */}
