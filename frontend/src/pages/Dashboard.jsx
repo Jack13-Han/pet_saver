@@ -214,7 +214,7 @@ export default function Dashboard() {
     : 100;
   const petMood = getMoodFromProgress(progress);
   const shopPreview = (data?.shopPreview || []).filter(item => item.category === "avatar" && item.avatar_type);
-  const achievementsPreview = data?.achievements?.slice(0, 4) || [];
+  const achievementsPreview = (data?.achievements || []).filter((ach) => ach.is_unlocked).slice(0, 4);
   const getShopPreviewIcon = (item) => {
     if (item.avatar_type) return avatarTypes.find(type => type.id === item.avatar_type)?.emoji || item.icon;
     return item.icon;
@@ -245,6 +245,7 @@ export default function Dashboard() {
     color: "var(--text-primary)",
     boxShadow: "0 28px 70px rgba(0, 0, 0, 0.15)",
   };
+
 
   const getPetImage = () => {
     return getPetImageForTarget(target);
@@ -1016,6 +1017,7 @@ export default function Dashboard() {
               </button>
             </div>
           )}
+
 
           {/* TRANSACTION INPUT */}
           {target && (
@@ -1874,7 +1876,7 @@ export default function Dashboard() {
               ))}
               {achievementsPreview.length === 0 && (
                 <div className="side-achievement-empty">
-                  Complete quests and saving goals to unlock achievements.
+                  No unlocked achievements yet.
                 </div>
               )}
             </div>
