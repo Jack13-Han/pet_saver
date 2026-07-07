@@ -3958,7 +3958,6 @@ select.form-input {
 }
 
 .settings-nav {
-  min-height: calc(100vh - 48px);
   padding: 12px;
   border-radius: var(--radius-lg);
   background: var(--bg-card);
