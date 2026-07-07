@@ -1,7 +1,7 @@
 import React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
-import { Home, Target, Receipt, ShoppingBag, Trophy, Camera, Medal, Settings, Flame, X, BarChart3, WalletCards } from 'lucide-react'
+import { Home, Target, Receipt, ShoppingBag, Trophy, Camera, Medal, Settings, LogOut, Flame, X, BarChart3, WalletCards } from 'lucide-react'
 
 const navItems = [
   { path: '/', icon: Home, label: 'Home' },
@@ -20,7 +20,7 @@ const navItems = [
 export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
@@ -74,6 +74,10 @@ export default function Sidebar({ isOpen, onClose }) {
           </div>
         </div>
 
+        <button className="nav-item logout-btn" onClick={logout} style={{ marginTop: 16, width: '100%' }}>
+          <LogOut size={20} />
+          <span>Logout</span>
+        </button>
       </div>
     </aside>
   )
