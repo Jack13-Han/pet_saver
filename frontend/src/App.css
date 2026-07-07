@@ -71,6 +71,32 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+html,
+body,
+#root {
+  min-width: 0;
+  width: 100%;
+}
+
+html,
+body {
+  overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
 :root[data-theme="dark"] body {
   color-scheme: dark;
 }
@@ -4156,6 +4182,11 @@ select.form-input {
   color: #dc2626;
 }
 
+.settings-logout-mobile {
+  display: none;
+  margin-top: 8px;
+}
+
 .settings-content {
   min-width: 0;
 }
@@ -4366,23 +4397,96 @@ select.form-input {
 }
 
 @media (max-width: 640px) {
+  .app-layout {
+    width: 100%;
+    overflow-x: hidden;
+  }
+  .mobile-header {
+    height: 60px;
+    padding: 0 max(12px, env(safe-area-inset-left)) 0 max(12px, env(safe-area-inset-right));
+  }
+  .mobile-header .font-extrabold {
+    min-width: 0;
+    max-width: calc(100vw - 112px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 16px;
+  }
+  .sidebar {
+    width: min(300px, 86vw);
+    max-width: 100vw;
+    padding: 18px 12px max(18px, env(safe-area-inset-bottom));
+  }
   .calendar-day-overlay {
     align-items: flex-end;
     padding: 0;
   }
   .main-content {
-    padding: 80px 12px 20px;
+    width: 100%;
+    padding: 76px 12px max(20px, env(safe-area-inset-bottom));
+    overflow-x: hidden;
   }
   .page-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+    min-width: 0;
+  }
+  .page-title,
+  .page-title h2,
+  .page-title p {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .page-title h2 {
+    font-size: 24px;
+    line-height: 1.2;
+  }
+  .header-actions,
+  .streak-badge {
+    width: 100%;
+  }
+  .streak-badge {
+    justify-content: center;
+    border-radius: var(--radius-md);
+  }
+  .btn,
+  .tx-btn,
+  .card-action,
+  .nav-item,
+  .settings-tab,
+  .settings-logout {
+    min-height: 44px;
+  }
+  .btn {
+    justify-content: center;
+    white-space: normal;
+  }
+  .card,
+  .goal-card,
+  .scanner-preview,
+  .shop-item,
+  .ranking-item {
+    min-width: 0;
   }
   .dashboard-grid {
     gap: 16px;
   }
   .shop-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px;
+  }
+  .shop-item {
+    padding: 12px 10px;
+  }
+  .shop-item-icon {
+    font-size: 34px;
+  }
+  .shop-item-name,
+  .shop-item-price {
+    overflow-wrap: anywhere;
   }
   .shop-notification {
     grid-template-columns: 82px minmax(0, 1fr);
@@ -4536,6 +4640,24 @@ select.form-input {
   .transaction-input {
     flex-direction: column;
   }
+  .goal-meta,
+  .calendar-day-transaction,
+  .ranking-item,
+  .pet-care-heading,
+  .deadline-warning {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .goal-meta {
+    gap: 4px;
+  }
+  .care-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pet-level-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
   .tx-buttons {
     width: 100%;
   }
@@ -4545,6 +4667,39 @@ select.form-input {
   }
   .card {
     padding: 16px;
+  }
+  .scanner-container {
+    max-width: none;
+  }
+  .scanner-upload {
+    padding: 34px 16px;
+  }
+  .scanner-preview {
+    margin-top: 16px;
+    padding: 14px;
+  }
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 12px;
+  }
+  .modal-content,
+  .delete-confirm-box,
+  .failure-modal,
+  .shop-preview-modal,
+  .shop-purchase-modal {
+    width: 100%;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    border-radius: 22px;
+  }
+  .delete-confirm-box,
+  .failure-modal {
+    padding: 24px 18px 18px;
+  }
+  .delete-confirm-actions,
+  .shop-purchase-actions,
+  .quick-save-actions {
+    grid-template-columns: 1fr;
   }
   .login-card {
     padding: 24px 20px;
@@ -4600,12 +4755,16 @@ select.form-input {
     min-height: 40px;
     margin-top: 0;
     padding: 9px 12px;
-    position: fixed;
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
-    z-index: 30;
-    box-shadow: var(--shadow-md);
+    position: static;
+    box-shadow: none;
+  }
+  .settings-logout-desktop {
+    display: none;
+  }
+  .settings-logout-mobile {
+    display: flex;
+    width: 100%;
+    margin-top: 6px;
   }
   .settings-panel {
     width: 100%;
