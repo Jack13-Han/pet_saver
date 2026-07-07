@@ -778,6 +778,7 @@ if ($path === 'transactions' && $method === 'POST') {
     }
 
     $petReaction = null;
+    $coinsEarned = 0;
     $pdo->beginTransaction();
     try {
         $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, category, note, transaction_date) VALUES (?, ?, ?, ?, ?, ?, ?)")
@@ -848,12 +849,17 @@ if ($path === 'transactions' && $method === 'POST') {
 
         checkAchievements($pdo, $userId);
         $pdo->commit();
+        $coinStmt = $pdo->prepare("SELECT coins FROM users WHERE id = ?");
+        $coinStmt->execute([$userId]);
+        $coinBalance = (int)$coinStmt->fetchColumn();
         successResponse([
             'new_amount' => $newAmount,
             'progress' => round($displayProgress, 1),
             'actual_progress' => round($progress, 1),
             'status' => $status,
             'mood' => $mood,
+            'coins_earned' => $coinsEarned,
+            'coin_balance' => $coinBalance,
             'pet_reaction' => $petReaction,
         ], 'Transaction recorded');
     } catch (Throwable $e) {
@@ -1404,8 +1410,11 @@ if ($path === 'missions/claim' && $method === 'POST') {
     $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$reward, $userId]);
     $petReaction = rewardPetForMoneyAction($pdo, $userId, null, 'mission', $reward);
     $pdo->commit();
+    $coinStmt = $pdo->prepare("SELECT coins FROM users WHERE id = ?");
+    $coinStmt->execute([$userId]);
+    $coinBalance = (int)$coinStmt->fetchColumn();
 
-    successResponse(['coins' => $reward, 'pet_reaction' => $petReaction], 'Mission reward claimed');
+    successResponse(['coins' => $reward, 'coin_balance' => $coinBalance, 'pet_reaction' => $petReaction], 'Mission reward claimed');
 }
 
 if ($path === 'daily-quests/claim' && $method === 'POST') {
@@ -1434,9 +1443,13 @@ if ($path === 'daily-quests/claim' && $method === 'POST') {
             ->execute([$reward, $userId]);
         $petReaction = rewardPetForMoneyAction($pdo, $userId, null, 'quest', $reward);
         $pdo->commit();
+        $coinStmt = $pdo->prepare("SELECT coins FROM users WHERE id = ?");
+        $coinStmt->execute([$userId]);
+        $coinBalance = (int)$coinStmt->fetchColumn();
 
         successResponse([
             'coins' => $reward,
+            'coin_balance' => $coinBalance,
             'pet_reaction' => $petReaction,
             'quests' => getDailyMoneyQuests($pdo, $userId),
         ], 'Daily quest reward claimed');

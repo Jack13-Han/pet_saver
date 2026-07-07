@@ -36,6 +36,7 @@ import {
 } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import FinanceCalendar from "../components/FinanceCalendar.jsx";
+import GoalCompletionNotice from "../components/GoalCompletionNotice.jsx";
 import { useLanguage } from "../i18n.jsx";
 import { realOCR } from "./ReceiptScanner.jsx";
 import { avatarEmojis, avatarTypes, getPetImageForTarget } from "../petAssets.js";
@@ -175,12 +176,27 @@ export default function Dashboard() {
   const [shopConfirmItem, setShopConfirmItem] = useState(null);
   const [buyingShopItemId, setBuyingShopItemId] = useState(null);
   const [shopNotice, setShopNotice] = useState(null);
+  const [goalCompletionNotice, setGoalCompletionNotice] = useState(null);
   const fileInputRef = useRef(null);
   const { user, updateUser } = useAuth();
   const { language } = useLanguage();
   const navigate = useNavigate();
   const tutorial = tutorialContent[language] || tutorialContent.en;
   const activeTutorialStep = tutorial.steps[tutorialStep];
+
+  const syncCoinBalance = (coinBalance) => {
+    const nextCoins = Number(coinBalance);
+    if (!Number.isFinite(nextCoins)) return false;
+    updateUser({ coins: nextCoins });
+    setData((prev) => ({
+      ...prev,
+      user: {
+        ...prev.user,
+        coins: nextCoins,
+      },
+    }));
+    return true;
+  };
 
   const setQuickSaveCategory = (category) => {
     const nextCategory = category || "General";
@@ -415,7 +431,10 @@ export default function Dashboard() {
         date: transactionDate,
       });
 
-      showPetReaction(res.data?.pet_reaction);
+      const completedGoal = type === "deposit" && data?.activeTarget && res.data.status === "completed";
+
+      if (!completedGoal) {
+        showPetReaction(res.data?.pet_reaction);
 
       setAnimatingPet(true);
       setTimeout(() => setAnimatingPet(false), 1000);
@@ -424,6 +443,8 @@ export default function Dashboard() {
           ? `Saved ¥${numAmount.toLocaleString()}! 🎉`
           : `Deducted ¥${numAmount.toLocaleString()}`,
       );
+
+      }
 
       if (type === "deposit" && data?.activeTarget) {
         setData((prev) => ({
@@ -441,11 +462,19 @@ export default function Dashboard() {
         }));
 
         if (res.data.status === "completed") {
-          showToast("🎉 Goal completed! You earned coins!");
-          const currentCoins = user?.coins || parseInt(JSON.parse(localStorage.getItem('user'))?.coins) || 0;
-          updateUser({
-            coins: currentCoins + Math.floor(data.activeTarget.target_amount / 100),
+          setPetReaction(null);
+          setGoalCompletionNotice({
+            goalName: data.activeTarget.name,
+            coinsEarned: Number(res.data?.coins_earned || 0),
           });
+          if (!syncCoinBalance(res.data?.coin_balance)) {
+            const coinsEarned = Number(
+              res.data?.coins_earned ?? Math.floor(Number(data.activeTarget.target_amount || 0) / 100),
+            );
+            updateUser((currentUser) => ({
+              coins: Number(currentUser?.coins || 0) + coinsEarned,
+            }));
+          }
         }
       }
 
@@ -517,16 +546,22 @@ export default function Dashboard() {
     try {
       const res = await dailyQuestApi.claim(questId);
       const coinsEarned = Number(res.data?.coins || 0);
+      const coinBalance = Number(res.data?.coin_balance);
       setData((prev) => ({
         ...prev,
         dailyQuests: res.data?.quests || prev.dailyQuests,
         user: {
           ...prev.user,
-          coins: Number(prev.user?.coins || 0) + coinsEarned,
+          coins: Number.isFinite(coinBalance)
+            ? coinBalance
+            : Number(prev.user?.coins || 0) + coinsEarned,
         },
       }));
-      updateUser({ coins: Number(user?.coins || 0) + coinsEarned });
-      showPetReaction(res.data?.pet_reaction);
+      if (!syncCoinBalance(coinBalance)) {
+        updateUser((currentUser) => ({
+          coins: Number(currentUser?.coins || 0) + coinsEarned,
+        }));
+      }
       showToast(`Daily quest complete! +${coinsEarned} coins`);
     } catch (err) {
       showToast(err.message || "Failed to claim daily quest", "error");
@@ -673,6 +708,8 @@ export default function Dashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <GoalCompletionNotice notice={goalCompletionNotice} onClose={() => setGoalCompletionNotice(null)} />
 
       <AnimatePresence>
         {shopConfirmItem && (

@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
+import { USER_SYNC_EVENT } from '../api.js'
 import { Home, Target, Receipt, ShoppingBag, Trophy, Camera, Medal, Settings, Flame, X, BarChart3, WalletCards } from 'lucide-react'
 
 const navItems = [
@@ -16,6 +17,71 @@ const navItems = [
   { path: '/rankings', icon: Medal, label: 'Rankings' },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ]
+
+function getStoredCoins() {
+  try {
+    const storedUser = JSON.parse(localStorage.getItem('user') || '{}')
+    const storedCoins = Number(storedUser?.coins)
+    return Number.isFinite(storedCoins) ? storedCoins : 0
+  } catch {
+    return 0
+  }
+}
+
+function CoinBalance() {
+  const { user, refreshUser } = useAuth()
+  const [coins, setCoins] = useState(() => {
+    const authCoins = Number(user?.coins)
+    return Number.isFinite(authCoins) ? authCoins : getStoredCoins()
+  })
+
+  useEffect(() => {
+    const authCoins = Number(user?.coins)
+    if (Number.isFinite(authCoins)) setCoins(authCoins)
+  }, [user?.coins])
+
+  useEffect(() => {
+    const handleUserSync = (event) => {
+      const nextCoins = Number(event.detail?.coins)
+      if (Number.isFinite(nextCoins)) setCoins(nextCoins)
+    }
+
+    window.addEventListener(USER_SYNC_EVENT, handleUserSync)
+    return () => window.removeEventListener(USER_SYNC_EVENT, handleUserSync)
+  }, [])
+
+  useEffect(() => {
+    if (!user || !refreshUser) return undefined
+
+    let cancelled = false
+    const syncCoins = async () => {
+      const freshUser = await refreshUser()
+      const nextCoins = Number(freshUser?.coins)
+      if (!cancelled && Number.isFinite(nextCoins)) setCoins(nextCoins)
+    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') syncCoins()
+    }
+
+    syncCoins()
+    const intervalId = window.setInterval(syncCoins, 1000)
+    window.addEventListener('focus', syncCoins)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', syncCoins)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [refreshUser, user?.id])
+
+  return (
+    <div className="coin-amount" data-no-translate>
+      {coins.toLocaleString()}
+    </div>
+  )
+}
 
 export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation()
@@ -59,7 +125,7 @@ export default function Sidebar({ isOpen, onClose }) {
         <div className="user-coins">
           <div className="coin-icon">🪙</div>
           <div>
-            <div className="coin-amount">{user?.coins?.toLocaleString() || 0}</div>
+            <CoinBalance />
             <div className="coin-label">Coins</div>
           </div>
         </div>
