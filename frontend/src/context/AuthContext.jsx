@@ -11,6 +11,19 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem("token");
     const savedUser = localStorage.getItem("user");
     const bootstrapAuth = async () => {
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          if (parsed && parsed.isGuest) {
+            setUser(parsed);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          // ignore parsing error
+        }
+      }
+
       if (!token || !savedUser) {
         setLoading(false);
         return;
@@ -88,9 +101,23 @@ export function AuthProvider({ children }) {
     return nextUser || { ...user, ...payload, ...responseData };
   };
 
+  const loginAsGuest = () => {
+    const guestUser = {
+      isGuest: true,
+      username: "Guest User",
+      email: "guest@pet-saver.local",
+      coins: 0,
+      level: 1,
+      profile_image: "",
+      bio: "Trying Pet Saver as a guest!"
+    };
+    setUser(guestUser);
+    localStorage.setItem("user", JSON.stringify(guestUser));
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, login, logout, register, updateUser, loading }}
+      value={{ user, login, logout, register, updateUser, loginAsGuest, loading }}
     >
       {children}
     </AuthContext.Provider>

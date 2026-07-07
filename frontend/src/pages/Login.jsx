@@ -18,7 +18,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
-  const { login, register } = useAuth()
+  const { login, register, loginAsGuest } = useAuth()
 
   const isLogin = mode === 'login'
   const isRegister = mode === 'register'
@@ -196,6 +196,17 @@ export default function Login() {
             </motion.button>
           </motion.form>
         </AnimatePresence>
+
+        <div className="login-toggle" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: 16, marginBottom: 16 }}>
+          <span>Try without an account? </span>
+          <button
+            type="button"
+            onClick={loginAsGuest}
+            style={{ marginLeft: 6, fontWeight: 'bold', color: '#10b981', border: 'none', background: 'none', cursor: 'pointer' }}
+          >
+            Continue as Guest / ဧည့်သည်အဖြစ် စမ်းသုံးရန်
+          </button>
+        </div>
 
         <div className="login-toggle">
           {isRegister ? 'Already have an account? ' : "Don't have an account? "}
