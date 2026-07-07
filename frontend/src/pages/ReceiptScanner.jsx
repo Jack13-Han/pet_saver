@@ -484,7 +484,7 @@ export default function ReceiptScanner() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex gap-4 pt-2">
+                    <div className="flex flex-col sm:flex-row gap-4 pt-2">
                       <button
                         className="px-6 py-3.5 rounded-2xl font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors flex-1 flex items-center justify-center gap-2"
                         onClick={() => {

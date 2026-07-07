@@ -181,55 +181,6 @@ export default function Shop() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {confirmItem && (
-          <motion.div
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setConfirmItem(null)}
-          >
-            <motion.div
-              className="delete-confirm-modal"
-              initial={{ scale: 0.92, y: 24 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.92, y: 24 }}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="delete-confirm-box">
-                <button className="modal-close delete-confirm-close" onClick={() => setConfirmItem(null)} aria-label="Close">
-                  <X size={18} />
-                </button>
-                <div style={{ fontSize: 46, marginBottom: 8 }}>{getItemIcon(confirmItem)}</div>
-                <h3>Buy this item?</h3>
-                <p>
-                  {confirmItem.name} costs {Number(confirmItem.price || 0).toLocaleString()} coins.
-                </p>
-                <div className="delete-confirm-actions">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setConfirmItem(null)}
-                    disabled={purchasing === confirmItem.id}
-                  >
-                    No
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={confirmPurchase}
-                    disabled={purchasing === confirmItem.id}
-                  >
-                    {purchasing === confirmItem.id ? 'Buying...' : 'Yes'}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
         {sellConfirmItem && (
           <motion.div
             className="modal-overlay"
@@ -311,7 +262,7 @@ export default function Shop() {
               </button>
               {!item.owned && (
                 <button className="btn btn-primary" style={{ marginTop: 12, padding: '8px 16px', fontSize: 13, width: '100%' }}
-                  onClick={() => setConfirmItem(item)}
+                  onClick={() => handleBuy(item)}
                   disabled={purchasing === item.id || user?.coins < item.price}>
                   {purchasing === item.id ? 'Buying...' : user?.coins < item.price ? <><Lock size={14} /> Need coins</> : 'Buy'}
                 </button>
@@ -417,7 +368,7 @@ export default function Shop() {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={() => handleBuy(confirmItem)}
+                  onClick={confirmPurchase}
                   disabled={purchasing !== null}
                 >
                   {purchasing === confirmItem.id ? 'Buying...' : 'Confirm Purchase'}
