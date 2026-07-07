@@ -198,9 +198,33 @@ if ($path === 'auth/login' && $method === 'POST') {
     ]);
 }
 
+if ($path === 'auth/change-password' && $method === 'POST') {
+    $username = trim($input['username'] ?? '');
+    $currentPassword = $input['current_password'] ?? '';
+    $newPassword = $input['new_password'] ?? '';
+
+    if (strlen($username) < 3 || strlen($currentPassword) < 6 || strlen($newPassword) < 6) {
+        errorResponse('Username, current password, and new password of at least 6 characters are required');
+    }
+
+    $stmt = $pdo->prepare("SELECT id, password_hash FROM users WHERE username = ?");
+    $stmt->execute([$username]);
+    $targetUser = $stmt->fetch();
+
+    if (!$targetUser || !password_verify($currentPassword, $targetUser['password_hash'])) {
+        errorResponse('Invalid credentials', 401);
+    }
+
+    $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
+    $stmt = $pdo->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
+    $stmt->execute([$newHash, $targetUser['id']]);
+
+    successResponse(null, 'Password updated');
+}
+
 // PROTECTED ROUTES
 $user = getAuthUser();
-if (!$user && !in_array($path, ['auth/login', 'auth/register'])) {
+if (!$user && !in_array($path, ['auth/login', 'auth/register', 'auth/change-password'])) {
     errorResponse('Unauthorized', 401);
 }
 $userId = $user['sub'] ?? null;
@@ -1100,6 +1124,45 @@ if ($path === 'shop/buy' && $method === 'POST') {
     }
 }
 
+if ($path === 'shop/sell' && $method === 'POST') {
+    ensureAvatarShopItems($pdo);
+    $accessoryId = intval($input['accessory_id'] ?? 0);
+
+    $stmt = $pdo->prepare("SELECT * FROM accessories WHERE id = ?");
+    $stmt->execute([$accessoryId]);
+    $item = $stmt->fetch();
+    if (!$item) errorResponse('Item not found');
+    if (!in_array($item['name'], avatarUnlockNames(), true)) {
+        errorResponse('This item cannot be sold');
+    }
+
+    $stmt = $pdo->prepare("SELECT id FROM inventory WHERE user_id = ? AND accessory_id = ? AND target_id IS NULL LIMIT 1");
+    $stmt->execute([$userId, $accessoryId]);
+    $inventoryItem = $stmt->fetch();
+    if (!$inventoryItem) errorResponse('Item not owned', 404);
+
+    $avatarType = avatarUnlockTypeForName($item['name']);
+    if ($avatarType) {
+        $stmt = $pdo->prepare("SELECT id FROM targets WHERE user_id = ? AND avatar_type = ? AND status = 'active' LIMIT 1");
+        $stmt->execute([$userId, $avatarType]);
+        if ($stmt->fetch()) {
+            errorResponse('This avatar is used by an active goal');
+        }
+    }
+
+    $refund = max(1, (int)floor(((int)$item['price']) / 2));
+
+    $pdo->beginTransaction();
+    $pdo->prepare("DELETE FROM inventory WHERE id = ? AND user_id = ?")->execute([$inventoryItem['id'], $userId]);
+    $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$refund, $userId]);
+    $stmt = $pdo->prepare("SELECT coins FROM users WHERE id = ?");
+    $stmt->execute([$userId]);
+    $updatedCoins = (int)$stmt->fetchColumn();
+    $pdo->commit();
+
+    successResponse(['refund' => $refund, 'coins' => $updatedCoins], 'Item sold');
+}
+
 if ($path === 'inventory' && $method === 'GET') {
     $stmt = $pdo->prepare("SELECT i.*, a.name, a.icon, a.category, a.effect_happiness FROM inventory i JOIN accessories a ON i.accessory_id = a.id WHERE i.user_id = ?");
     $stmt->execute([$userId]);
@@ -1139,8 +1202,13 @@ if ($path === 'receipts' && $method === 'POST') {
     $petReaction = null;
     $pdo->beginTransaction();
     try {
+        $imagePath = trim((string)($input['image_path'] ?? ''));
+        if ($imagePath === '' || str_starts_with($imagePath, 'data:image/') || strlen($imagePath) > 255) {
+            $imagePath = null;
+        }
+
         $pdo->prepare("INSERT INTO receipts (user_id, image_path, shop_name, total_price, receipt_date, category, items, target_id, is_processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)")
-            ->execute([$userId, $input['image_path'] ?? null, trim($input['shop_name'] ?? ''), $totalPrice, $input['date'] ?? date('Y-m-d'), $input['category'] ?? 'Shopping', json_encode($input['items'] ?? []), $targetId ?: null]);
+            ->execute([$userId, $imagePath, trim($input['shop_name'] ?? ''), $totalPrice, $input['date'] ?? date('Y-m-d'), $input['category'] ?? 'Shopping', json_encode($input['items'] ?? []), $targetId ?: null]);
         $receiptId = $pdo->lastInsertId();
 
         if ($totalPrice > 0) {
@@ -1476,14 +1544,19 @@ function scanReceiptWithGemini($image, $mimeType)
         errorResponse('Gemini API key is missing in api/.env or config.php', 500);
     }
 
-    if (!preg_match('/^image\/(jpeg|jpg|png|webp|heic|heif)$/i', $mimeType)) {
+    $mimeType = strtolower(trim($mimeType ?: 'image/jpeg'));
+    if ($mimeType === 'image/jpg') {
+        $mimeType = 'image/jpeg';
+    }
+
+    if (!preg_match('/^image\/(jpeg|png|webp|heic|heif)$/', $mimeType)) {
         errorResponse('Unsupported receipt image type');
     }
 
     $prompt = "Analyze this receipt image and return strict JSON only. "
         . "Extract the official store name, final total paid amount, and transaction date. "
         . "If the receipt is Japanese, keep the store name in Japanese. "
-        . "For the total, use the final paid amount only and return an integer. "
+        . "For the total, use the final paid amount only, ignoring change, tax-only rows, and subtotals. "
         . "For missing year, assume 2026. Date format must be YYYY-MM-DD. "
         . "JSON keys: shop_name, total_price, date.";
 
@@ -1506,7 +1579,16 @@ function scanReceiptWithGemini($image, $mimeType)
             ]
         ]],
         'generationConfig' => [
-            'responseMimeType' => 'application/json'
+            'responseMimeType' => 'application/json',
+            'responseSchema' => [
+                'type' => 'object',
+                'properties' => [
+                    'shop_name' => ['type' => 'string'],
+                    'total_price' => ['type' => 'string'],
+                    'date' => ['type' => 'string']
+                ],
+                'required' => ['shop_name', 'total_price', 'date']
+            ]
         ]
     ];
 
@@ -1521,19 +1603,58 @@ function scanReceiptWithGemini($image, $mimeType)
     }
 
     $decoded = json_decode($body, true);
-    $text = $decoded['candidates'][0]['content']['parts'][0]['text'] ?? '';
-    $text = trim(preg_replace('/^```json|```$/m', '', $text));
+    $text = trim($decoded['candidates'][0]['content']['parts'][0]['text'] ?? '');
+    $text = trim(preg_replace('/^```(?:json)?|```$/m', '', $text));
     $parsed = json_decode($text, true);
+
+    if (!is_array($parsed) && preg_match('/\{.*\}/s', $text, $matches)) {
+        $parsed = json_decode($matches[0], true);
+    }
 
     if (!is_array($parsed)) {
         errorResponse('Gemini returned unreadable receipt data', 500);
     }
 
+    $totalPrice = normalizeReceiptTotal($parsed['total_price'] ?? 0);
+    $receiptDate = normalizeReceiptDate($parsed['date'] ?? '');
+
     return [
         'shop_name' => trim($parsed['shop_name'] ?? 'Unknown Shop') ?: 'Unknown Shop',
-        'total_price' => max(0, (int)round((float)($parsed['total_price'] ?? 0))),
-        'date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $parsed['date'] ?? '') ? $parsed['date'] : date('Y-m-d')
+        'total_price' => $totalPrice,
+        'date' => $receiptDate
     ];
+}
+
+function normalizeReceiptTotal($value)
+{
+    if (is_numeric($value)) {
+        return max(0, (int)round((float)$value));
+    }
+
+    $cleaned = preg_replace('/[^\d.]/', '', (string)$value);
+    if ($cleaned === '' || !is_numeric($cleaned)) {
+        return 0;
+    }
+
+    return max(0, (int)round((float)$cleaned));
+}
+
+function normalizeReceiptDate($value)
+{
+    $value = trim((string)$value);
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+        return $value;
+    }
+
+    if (preg_match('/^(\d{4})[\/.](\d{1,2})[\/.](\d{1,2})$/', $value, $matches)) {
+        return sprintf('%04d-%02d-%02d', (int)$matches[1], (int)$matches[2], (int)$matches[3]);
+    }
+
+    if (preg_match('/^(\d{1,2})[\/.](\d{1,2})$/', $value, $matches)) {
+        return sprintf('2026-%02d-%02d', (int)$matches[1], (int)$matches[2]);
+    }
+
+    return date('Y-m-d');
 }
 
 function postJson($url, $payload)
