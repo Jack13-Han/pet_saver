@@ -128,6 +128,50 @@ $input = json_decode(file_get_contents('php://input'), true);
 //newly added
 
 
+function achievementCatalog()
+{
+    return [
+        ['First Saver', 'Save or spend for the first time', 'piggy-bank', 'bronze', 1],
+        ['Three Saves', 'Record 3 savings deposits', 'coins', 'bronze', 3],
+        ['Ten Saves', 'Record 10 savings deposits', 'wallet', 'silver', 10],
+        ['Week Saver', 'Save 7 days in a row', 'calendar', 'silver', 7],
+        ['Goal Starter', 'Create your first saving goal', 'target', 'bronze', 1],
+        ['Goal Getter', 'Reach 50% of a goal', 'target', 'silver', 50],
+        ['Halfway Hero', 'Reach 75% of a goal', 'flag', 'silver', 75],
+        ['Goal Finisher', 'Complete your first target', 'trophy', 'gold', 1],
+        ['Diamond Hands', 'Complete 5 targets', 'gem', 'platinum', 5],
+        ['Money Master', 'Save 100000 total', 'crown', 'gold', 100000],
+        ['Yen 10K Club', 'Save 10000 total', 'badge-yen', 'silver', 10000],
+        ['Expense Tracker', 'Record 10 expenses', 'receipt', 'bronze', 10],
+        ['Budget Builder', 'Create your first monthly budget', 'wallet-cards', 'bronze', 1],
+        ['Planner Pro', 'Create 3 budgets', 'line-chart', 'silver', 3],
+        ['Calendar Keeper', 'Add 5 calendar notes', 'calendar-days', 'bronze', 5],
+        ['Receipt Pro', 'Scan 10 receipts', 'camera', 'silver', 10],
+        ['Receipt Collector', 'Scan 25 receipts', 'files', 'gold', 25],
+        ['Shopaholic', 'Buy 5 shop items', 'shopping-bag', 'bronze', 5],
+        ['Avatar Collector', 'Buy 3 avatars', 'paw-print', 'silver', 3],
+        ['Care Buddy', 'Use pet care 10 times', 'heart-handshake', 'bronze', 10],
+        ['Bond Builder', 'Use pet care 30 times', 'heart', 'gold', 30],
+        ['Quest Rookie', 'Claim 5 daily quests', 'check-circle', 'bronze', 5],
+        ['Quest Champion', 'Claim 25 daily quests', 'award', 'gold', 25],
+        ['Category Explorer', 'Track expenses in 5 categories', 'pie-chart', 'silver', 5],
+        ['Auto Planner', 'Create 2 recurring entries', 'repeat', 'silver', 2],
+    ];
+}
+
+function ensureUserAchievements($pdo, $userId)
+{
+    $stmt = $pdo->prepare("SELECT title FROM achievements WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    $existing = array_flip($stmt->fetchAll(PDO::FETCH_COLUMN));
+
+    $insert = $pdo->prepare("INSERT INTO achievements (user_id, title, description, icon, tier, max_progress) VALUES (?, ?, ?, ?, ?, ?)");
+    foreach (achievementCatalog() as $achievement) {
+        if (isset($existing[$achievement[0]])) continue;
+        $insert->execute([$userId, $achievement[0], $achievement[1], $achievement[2], $achievement[3], $achievement[4]]);
+    }
+}
+
 // AUTH
 if ($path === 'auth/register' && $method === 'POST') {
     $username = trim($input['username'] ?? '');
@@ -145,17 +189,7 @@ if ($path === 'auth/register' && $method === 'POST') {
     $stmt->execute([$username, $email, $hash]);
     $userId = $pdo->lastInsertId();
 
-    $achievements = [
-        ['First Saver', 'Save for the first time', 'piggy-bank', 'bronze', 1],
-        ['Week Saver', 'Save 7 days in a row', 'calendar', 'silver', 7],
-        ['Goal Getter', 'Reach 50% of a goal', 'target', 'silver', 50],
-        ['Money Master', 'Save 100000 total', 'crown', 'gold', 100000],
-        ['Shopaholic', 'Buy 5 accessories', 'shopping-bag', 'bronze', 5],
-        ['Receipt Pro', 'Scan 10 receipts', 'camera', 'silver', 10],
-        ['Diamond Hands', 'Complete 5 targets', 'gem', 'platinum', 5]
-    ];
-    $stmt = $pdo->prepare("INSERT INTO achievements (user_id, title, description, icon, tier, max_progress) VALUES (?, ?, ?, ?, ?, ?)");
-    foreach ($achievements as $a) $stmt->execute([$userId, $a[0], $a[1], $a[2], $a[3], $a[4]]);
+    ensureUserAchievements($pdo, $userId);
 
     $token = generateJWT($userId, $username);
     successResponse(['token' => $token, 'user' => ['id' => $userId, 'username' => $username, 'coins' => 1000, 'rank' => 'Bronze']]);
@@ -422,6 +456,7 @@ if ($path === 'dashboard' && $method === 'GET') {
     $stmt->execute([$userId]);
     $transactions = $stmt->fetchAll();
 
+    checkAchievements($pdo, $userId);
     $stmt = $pdo->prepare("SELECT * FROM achievements WHERE user_id = ? ORDER BY is_unlocked DESC, created_at DESC LIMIT 4");
     $stmt->execute([$userId]);
     $achievements = $stmt->fetchAll();
@@ -1093,6 +1128,7 @@ if ($path === 'inventory' && $method === 'GET') {
 }
 
 if ($path === 'achievements' && $method === 'GET') {
+    checkAchievements($pdo, $userId);
     $stmt = $pdo->prepare("SELECT * FROM achievements WHERE user_id = ? ORDER BY is_unlocked DESC, tier DESC");
     $stmt->execute([$userId]);
     successResponse($stmt->fetchAll());
@@ -2291,96 +2327,76 @@ function ensureCareActivityType($pdo)
 }
 function checkAchievements($pdo, $userId)
 {
-
     $userId = (int)$userId;
+    ensureUserAchievements($pdo, $userId);
 
-    // First Saver
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM transactions WHERE user_id = ?");
-    $stmt->execute([$userId]);
-    $count = (int)$stmt->fetchColumn();
+    $metric = function ($sql, $params = []) use ($pdo, $userId) {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(array_merge([$userId], $params));
+        return (float)($stmt->fetchColumn() ?: 0);
+    };
 
-    $pdo->prepare("
-        UPDATE achievements
-        SET progress = ?, is_unlocked = ?
-        WHERE user_id = ? AND title = 'First Saver'
-    ")->execute([
-        $count,
-        ($count >= 1 ? 1 : 0),
-        $userId
-    ]);
+    $userStmt = $pdo->prepare("SELECT streak_days, total_saved, total_targets_completed FROM users WHERE id = ?");
+    $userStmt->execute([$userId]);
+    $user = $userStmt->fetch() ?: [];
 
-    // Week Saver
-    $stmt = $pdo->prepare("SELECT streak_days FROM users WHERE id = ?");
-    $stmt->execute([$userId]);
-    $streak = (int)$stmt->fetchColumn();
-
-    $pdo->prepare("
-        UPDATE achievements
-        SET progress = ?, is_unlocked = ?
-        WHERE user_id = ? AND title = 'Week Saver'
-    ")->execute([
-        $streak,
-        ($streak >= 7 ? 1 : 0),
-        $userId
-    ]);
-
-    // Goal Getter
-    $stmt = $pdo->prepare("
-        SELECT MAX(current_amount / target_amount * 100)
+    $maxProgress = $metric("
+        SELECT COALESCE(MAX(CASE WHEN target_amount > 0 THEN current_amount / target_amount * 100 ELSE 0 END), 0)
         FROM targets
-        WHERE user_id = ? AND status = 'active'
+        WHERE user_id = ?
     ");
 
-    $stmt->execute([$userId]);
+    $values = [
+        'First Saver' => $metric("SELECT COUNT(*) FROM transactions WHERE user_id = ?"),
+        'Three Saves' => $metric("SELECT COUNT(*) FROM transactions WHERE user_id = ? AND type = 'deposit'"),
+        'Ten Saves' => $metric("SELECT COUNT(*) FROM transactions WHERE user_id = ? AND type = 'deposit'"),
+        'Week Saver' => (float)($user['streak_days'] ?? 0),
+        'Goal Starter' => $metric("SELECT COUNT(*) FROM targets WHERE user_id = ?"),
+        'Goal Getter' => $maxProgress,
+        'Halfway Hero' => $maxProgress,
+        'Goal Finisher' => (float)($user['total_targets_completed'] ?? 0),
+        'Diamond Hands' => (float)($user['total_targets_completed'] ?? 0),
+        'Money Master' => (float)($user['total_saved'] ?? 0),
+        'Yen 10K Club' => (float)($user['total_saved'] ?? 0),
+        'Expense Tracker' => $metric("SELECT COUNT(*) FROM transactions WHERE user_id = ? AND type = 'withdrawal'"),
+        'Budget Builder' => $metric("SELECT COUNT(*) FROM budgets WHERE user_id = ?"),
+        'Planner Pro' => $metric("SELECT COUNT(*) FROM budgets WHERE user_id = ?"),
+        'Calendar Keeper' => $metric("SELECT COUNT(*) FROM calendar_notes WHERE user_id = ?"),
+        'Receipt Pro' => $metric("SELECT COUNT(*) FROM receipts WHERE user_id = ?"),
+        'Receipt Collector' => $metric("SELECT COUNT(*) FROM receipts WHERE user_id = ?"),
+        'Shopaholic' => $metric("SELECT COUNT(*) FROM inventory WHERE user_id = ?"),
+        'Avatar Collector' => $metric("
+            SELECT COUNT(*)
+            FROM inventory i
+            JOIN accessories a ON a.id = i.accessory_id
+            WHERE i.user_id = ? AND a.category = 'avatar'
+        "),
+        'Care Buddy' => $metric("SELECT COUNT(*) FROM activity_log WHERE user_id = ? AND activity_type = 'care'"),
+        'Bond Builder' => $metric("SELECT COUNT(*) FROM activity_log WHERE user_id = ? AND activity_type = 'care'"),
+        'Quest Rookie' => $metric("SELECT COUNT(*) FROM daily_quest_claims WHERE user_id = ?"),
+        'Quest Champion' => $metric("SELECT COUNT(*) FROM daily_quest_claims WHERE user_id = ?"),
+        'Category Explorer' => $metric("
+            SELECT COUNT(DISTINCT category)
+            FROM transactions
+            WHERE user_id = ? AND type = 'withdrawal' AND category IS NOT NULL AND category <> ''
+        "),
+        'Auto Planner' => $metric("SELECT COUNT(*) FROM recurring_entries WHERE user_id = ? AND is_active = 1"),
+    ];
 
-    $maxProgress = (float)($stmt->fetchColumn() ?: 0);
+    $maxProgressByTitle = [];
+    foreach (achievementCatalog() as $achievement) {
+        $maxProgressByTitle[$achievement[0]] = (float)$achievement[4];
+    }
 
-    $pdo->prepare("
+    $update = $pdo->prepare("
         UPDATE achievements
         SET progress = ?, is_unlocked = ?
-        WHERE user_id = ? AND title = 'Goal Getter'
-    ")->execute([
-        $maxProgress,
-        ($maxProgress >= 50 ? 1 : 0),
-        $userId
-    ]);
-
-    // Money Master
-    $stmt = $pdo->prepare("SELECT total_saved FROM users WHERE id = ?");
-    $stmt->execute([$userId]);
-
-    $saved = (float)$stmt->fetchColumn();
-
-    $pdo->prepare("
-        UPDATE achievements
-        SET progress = ?, is_unlocked = ?
-        WHERE user_id = ? AND title = 'Money Master'
-    ")->execute([
-        $saved,
-        ($saved >= 100000 ? 1 : 0),
-        $userId
-    ]);
-
-    // Diamond Hands
-    $stmt = $pdo->prepare("
-        SELECT total_targets_completed
-        FROM users
-        WHERE id = ?
+        WHERE user_id = ? AND title = ?
     ");
-
-    $stmt->execute([$userId]);
-
-    $completed = (int)$stmt->fetchColumn();
-
-    $pdo->prepare("
-        UPDATE achievements
-        SET progress = ?, is_unlocked = ?
-        WHERE user_id = ? AND title = 'Diamond Hands'
-    ")->execute([
-        $completed,
-        ($completed >= 5 ? 1 : 0),
-        $userId
-    ]);
+    foreach ($values as $title => $progress) {
+        $target = $maxProgressByTitle[$title] ?? 1;
+        $update->execute([$progress, ($progress >= $target ? 1 : 0), $userId, $title]);
+    }
 
     // unlocked_at
     $pdo->prepare("

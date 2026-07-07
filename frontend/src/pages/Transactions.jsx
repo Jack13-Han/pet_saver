@@ -3,7 +3,6 @@ import { motion } from 'framer-motion'
 import { ArrowUpCircle, ArrowDownCircle, Calendar, Search, PieChart as PieChartIcon } from 'lucide-react'
 import { transactions as txApi } from '../api.js'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import FinanceCalendar from '../components/FinanceCalendar.jsx'
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28DFF', '#FF6B6B'];
 
@@ -108,10 +107,6 @@ export default function Transactions() {
         </div>
       </div>
 
-      <div style={{ marginBottom: 24 }}>
-        <FinanceCalendar onChanged={loadData} />
-      </div>
-      
       {/* Charts Section */}
       {(pieData.length > 0 || barData.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
