@@ -32,7 +32,6 @@ import {
   avatars as avatarApi,
   user as userApi,
   targets as targetApi,
-  calendar as calendarApi,
   shop as shopApi,
 } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
