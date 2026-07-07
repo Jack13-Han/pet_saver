@@ -197,9 +197,6 @@ export default function Settings() {
               </button>
             ))}
           </div>
-          <button onClick={logout} className="settings-logout">
-            <LogOut size={18} /><span>Logout</span>
-          </button>
         </nav>
 
         <motion.div className="settings-content" key={activeTab} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2 }}>

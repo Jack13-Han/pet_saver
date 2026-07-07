@@ -204,7 +204,7 @@ export default function Login() {
             onClick={loginAsGuest}
             style={{ marginLeft: 6, fontWeight: 'bold', color: '#10b981', border: 'none', background: 'none', cursor: 'pointer' }}
           >
-            Continue as Guest / ဧည့်သည်အဖြစ် စမ်းသုံးရန်
+            Continue as Guest
           </button>
         </div>
 
