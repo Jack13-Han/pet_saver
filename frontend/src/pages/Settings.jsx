@@ -390,8 +390,8 @@ export default function Settings() {
                     { id: 'dark', name: 'Midnight (Dark)', colors: ['#0f172a', '#1e293b', '#34d399'] },
                     { id: 'sakura', name: 'Sakura Garden', colors: ['#fff0f3', '#ffe3e8', '#f43f5e'] },
                     { id: 'lavender', name: 'Lavender Cozy', colors: ['#faf8ff', '#e8e0ff', '#8b5cf6'] },
-                    { id: 'cyberpunk', name: 'Cyberpunk Neon', colors: ['#0a0a16', '#151636', '#00ffcc'] },
-                    { id: 'gameboy', name: '8-Bit Retro', colors: ['#8bac0f', '#306230', '#0f380f'] },
+                    { id: 'cyberpunk', name: 'Cyberpunk Neon', colors: ['#0a0a14', '#18182e', '#ff007f'] },
+                    { id: 'gameboy', name: '8-Bit Retro', colors: ['#cad4b8', '#b3c09f', '#306230'] },
                   ].map(item => (
                     <button
                       type="button"

@@ -118,54 +118,54 @@
 
 /* CYBERPUNK NEON THEME */
 :root[data-theme="cyberpunk"] {
-  --bg-primary: #0a0a16;
-  --bg-secondary: #0d0e22;
-  --bg-card: #151636;
-  --bg-sidebar: #060714;
-  --accent-green: #00ffcc;
-  --accent-green-light: rgba(0, 255, 204, 0.12);
-  --accent-green-dark: #00cca3;
-  --accent-orange: #ff007f;
-  --accent-orange-light: rgba(255, 0, 127, 0.12);
-  --accent-blue: #390099;
-  --accent-blue-light: rgba(57, 0, 153, 0.15);
+  --bg-primary: #0a0a14;
+  --bg-secondary: #111122;
+  --bg-card: #18182e;
+  --bg-sidebar: #07070f;
+  --accent-green: #ff007f;
+  --accent-green-light: rgba(255, 0, 127, 0.12);
+  --accent-green-dark: #cc0066;
+  --accent-orange: #00ffcc;
+  --accent-orange-light: rgba(0, 255, 204, 0.12);
+  --accent-blue: #00e5ff;
+  --accent-blue-light: rgba(0, 229, 255, 0.12);
   --accent-yellow: #fefe00;
   --accent-yellow-light: rgba(254, 254, 0, 0.12);
   --accent-purple: #9d4edd;
   --text-primary: #f8fafc;
-  --text-secondary: #00ffcc;
-  --text-muted: #7075b3;
-  --border-color: #272963;
-  --shadow-sm: 0 1px 2px 0 rgba(0, 255, 204, 0.2);
-  --shadow-md: 0 4px 12px rgba(0, 255, 204, 0.3);
-  --shadow-lg: 0 8px 24px rgba(255, 0, 127, 0.35);
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  --border-color: #27273f;
+  --shadow-sm: 0 1px 2px 0 rgba(255, 0, 127, 0.15);
+  --shadow-md: 0 4px 12px rgba(255, 0, 127, 0.25);
+  --shadow-lg: 0 8px 24px rgba(0, 255, 204, 0.25);
   --sidebar-text-inactive: #7075b3;
 }
 
 /* RETRO GAMEBOY THEME */
 :root[data-theme="gameboy"] {
-  --bg-primary: #8bac0f;
-  --bg-secondary: #9bbc0f;
-  --bg-card: #8bac0f;
-  --bg-sidebar: #306230;
-  --accent-green: #0f380f;
-  --accent-green-light: #9bbc0f;
-  --accent-green-dark: #306230;
+  --bg-primary: #cad4b8;
+  --bg-secondary: #d3dcc1;
+  --bg-card: #d3dcc1;
+  --bg-sidebar: #b3c09f;
+  --accent-green: #306230;
+  --accent-green-light: #cad4b8;
+  --accent-green-dark: #0f380f;
   --accent-orange: #306230;
-  --accent-orange-light: #8bac0f;
+  --accent-orange-light: #cad4b8;
   --accent-blue: #306230;
-  --accent-blue-light: #8bac0f;
-  --accent-yellow: #0f380f;
-  --accent-yellow-light: #9bbc0f;
+  --accent-blue-light: #cad4b8;
+  --accent-yellow: #306230;
+  --accent-yellow-light: #cad4b8;
   --accent-purple: #306230;
   --text-primary: #0f380f;
   --text-secondary: #306230;
   --text-muted: #306230;
-  --border-color: #306230;
+  --border-color: #9eb189;
   --shadow-sm: none;
   --shadow-md: none;
   --shadow-lg: none;
-  --sidebar-text-inactive: #8bac0f;
+  --sidebar-text-inactive: #0f380f;
 }
 
 body {
