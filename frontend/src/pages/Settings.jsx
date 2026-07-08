@@ -376,7 +376,7 @@ export default function Settings() {
               <h3 className="settings-panel-title">Appearance</h3>
               <div className="settings-option" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 16 }}>
                 <div className="settings-option-copy">
-                  <div className="settings-option-title">Theme Selector / အပြင်အဆင်ရွေးချယ်ရန်</div>
+                  <div className="settings-option-title">Theme Selector</div>
                   <div className="settings-option-desc">Choose your favorite colors and layout theme</div>
                 </div>
                 <div style={{
@@ -386,12 +386,12 @@ export default function Settings() {
                   marginTop: 8
                 }}>
                   {[
-                    { id: 'light', name: 'Sunny (Light)', my: 'နွေဦးကာလ', colors: ['#fff8f0', '#fb923c', '#4ade80'] },
-                    { id: 'dark', name: 'Midnight (Dark)', my: 'သန်းခေါင်ယံ', colors: ['#0f172a', '#1e293b', '#34d399'] },
-                    { id: 'sakura', name: 'Sakura Garden', my: 'ချယ်ရီပန်းခြံ', colors: ['#fff0f3', '#ffe3e8', '#f43f5e'] },
-                    { id: 'lavender', name: 'Lavender Cozy', my: 'Cozy Lavender', colors: ['#faf8ff', '#e8e0ff', '#8b5cf6'] },
-                    { id: 'cyberpunk', name: 'Cyberpunk Neon', my: 'Cyberpunk', colors: ['#0a0a16', '#151636', '#00ffcc'] },
-                    { id: 'gameboy', name: '8-Bit Retro', my: '၈-ဘစ်စတိုင်', colors: ['#8bac0f', '#306230', '#0f380f'] },
+                    { id: 'light', name: 'Sunny (Light)', colors: ['#fff8f0', '#fb923c', '#4ade80'] },
+                    { id: 'dark', name: 'Midnight (Dark)', colors: ['#0f172a', '#1e293b', '#34d399'] },
+                    { id: 'sakura', name: 'Sakura Garden', colors: ['#fff0f3', '#ffe3e8', '#f43f5e'] },
+                    { id: 'lavender', name: 'Lavender Cozy', colors: ['#faf8ff', '#e8e0ff', '#8b5cf6'] },
+                    { id: 'cyberpunk', name: 'Cyberpunk Neon', colors: ['#0a0a16', '#151636', '#00ffcc'] },
+                    { id: 'gameboy', name: '8-Bit Retro', colors: ['#8bac0f', '#306230', '#0f380f'] },
                   ].map(item => (
                     <button
                       type="button"
@@ -417,7 +417,6 @@ export default function Settings() {
                         ))}
                       </div>
                       <span style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-primary)' }}>{item.name}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{item.my}</span>
                     </button>
                   ))}
                 </div>
