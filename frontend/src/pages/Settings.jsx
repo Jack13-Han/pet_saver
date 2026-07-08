@@ -68,7 +68,8 @@ export default function Settings() {
       milestones: true,
       streak_alerts: true,
       achievements: true,
-      weekly_summary: false
+      weekly_summary: false,
+      sound_effects: true
     }
   })
   const updateNotification = (key, value) => {
@@ -310,6 +311,7 @@ export default function Settings() {
                   { key: 'streak_alerts', label: 'Streak Alerts', desc: 'Warn when streak is about to break' },
                   { key: 'achievements', label: 'Achievement Unlocks', desc: 'Celebrate when you earn badges' },
                   { key: 'weekly_summary', label: 'Weekly Summary', desc: 'Weekly report of savings' },
+                  { key: 'sound_effects', label: 'Sound Effects 🎵', desc: 'Play arcade sounds on saving and level ups' },
                 ].map((item, i) => (
                   <div key={i} className="settings-option">
                     <div className="settings-option-copy">

@@ -3648,6 +3648,197 @@ select.form-input {
   }
 }
 
+/* ===================================================
+   NOTIFICATION BANNERS (Daily Reminder / Streak Alert)
+   =================================================== */
+.notification-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  margin: 0 0 12px;
+  border: 1px solid transparent;
+  font-family: var(--font-body, inherit);
+}
+
+.notification-banner-reminder {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(16, 185, 129, 0.07));
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.notification-banner-streak {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.12), rgba(239, 68, 68, 0.08));
+  border-color: rgba(249, 115, 22, 0.24);
+}
+
+.notification-banner-icon {
+  font-size: 26px;
+  flex-shrink: 0;
+}
+
+.notification-banner-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.notification-banner-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.notification-banner-cta {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  transition: transform 0.15s, box-shadow 0.15s;
+  background: var(--accent-green);
+  color: white;
+}
+.notification-banner-streak .notification-banner-cta {
+  background: linear-gradient(135deg, #f97316, #ef4444);
+}
+
+.notification-banner-cta:hover {
+  transform: scale(1.04);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* ===================================================
+   ACHIEVEMENT UNLOCK NOTICE
+   =================================================== */
+.achievement-notice {
+  max-width: 380px !important;
+}
+
+.achievement-stars {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+
+.achievement-badge-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.achievement-coins-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.15), rgba(251, 146, 60, 0.12));
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+}
+
+/* ===================================================
+   WEEKLY SUMMARY NOTICE
+   =================================================== */
+.weekly-summary-notice {
+  max-width: 420px !important;
+}
+
+.weekly-stats-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.weekly-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.weekly-stat-saved {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.2);
+  color: var(--accent-green);
+}
+
+.weekly-stat-spent {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.weekly-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.weekly-stat-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+.weekly-rate-section {
+  margin-bottom: 14px;
+}
+
+.weekly-rate-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.weekly-rate-track {
+  height: 10px;
+  background: var(--border-color);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.weekly-rate-fill {
+  height: 100%;
+  border-radius: 99px;
+  min-width: 4px;
+}
+
+.weekly-pet-message {
+  background: var(--bg-surface, var(--bg-card));
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+  border: 1px solid var(--border-color);
+}
+
+.weekly-pet-message p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+
 @keyframes deadline-ring {
   0%,
   100% {

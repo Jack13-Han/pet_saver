@@ -38,6 +38,9 @@ import { useAuth } from "../context/AuthContext.jsx";
 import FinanceCalendar from "../components/FinanceCalendar.jsx";
 import GoalCompletionNotice from "../components/GoalCompletionNotice.jsx";
 import GoalMilestoneNotice from "../components/GoalMilestoneNotice.jsx";
+import AchievementUnlockNotice from "../components/AchievementUnlockNotice.jsx";
+import WeeklySummaryNotice from "../components/WeeklySummaryNotice.jsx";
+import { playCoinSound, playCareSound, playFanfareSound, playWarningSound } from "../audioManager.js";
 import { useLanguage } from "../i18n.jsx";
 import { realOCR } from "./ReceiptScanner.jsx";
 import { avatarEmojis, avatarTypes, getPetImageForTarget } from "../petAssets.js";
@@ -179,6 +182,8 @@ export default function Dashboard() {
   const [shopNotice, setShopNotice] = useState(null);
   const [goalCompletionNotice, setGoalCompletionNotice] = useState(null);
   const [goalMilestoneNotice, setGoalMilestoneNotice] = useState(null);
+  const [achievementNotice, setAchievementNotice] = useState(null);
+  const [weeklySummary, setWeeklySummary] = useState(null);
   const fileInputRef = useRef(null);
   const { user, updateUser } = useAuth();
   const { language } = useLanguage();
@@ -318,6 +323,64 @@ export default function Dashboard() {
     loadDashboard();
   }, []);
 
+  // Weekly summary: show once per week on first login of the week
+  useEffect(() => {
+    if (!data) return;
+    const prefs = JSON.parse(localStorage.getItem('notification_preferences') || '{}');
+    if (prefs.weekly_summary === false) return;
+
+    const weekKey = (() => {
+      const now = new Date();
+      const day = now.getDay();
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - ((day + 6) % 7));
+      return `weekly_summary_${monday.toISOString().split('T')[0]}`;
+    })();
+    if (localStorage.getItem(weekKey)) return;
+    localStorage.setItem(weekKey, '1');
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentTx = (data.transactions || []).filter(tx => {
+      const d = new Date(tx.transaction_date || tx.date || '');
+      return d >= sevenDaysAgo;
+    });
+    const totalSaved = recentTx.filter(t => t.type === 'deposit').reduce((s, t) => s + Number(t.amount || 0), 0);
+    const totalSpent = recentTx.filter(t => t.type === 'withdrawal').reduce((s, t) => s + Number(t.amount || 0), 0);
+    const savingsRate = (totalSaved + totalSpent) > 0 ? (totalSaved / (totalSaved + totalSpent)) * 100 : 0;
+    const petEmoji = avatarTypes.find(a => a.id === data.activeTarget?.avatar_type)?.emoji || '🐾';
+    setWeeklySummary({
+      totalSaved,
+      totalSpent,
+      savingsRate,
+      petName: data.activeTarget?.avatar_name || 'Your Pet',
+      petEmoji,
+    });
+  }, [data]);
+
+  // Achievement unlock: check for newly unlocked achievements on data load
+  useEffect(() => {
+    if (!data?.achievements) return;
+    const prefs = JSON.parse(localStorage.getItem('notification_preferences') || '{}');
+    if (prefs.achievements === false) return;
+
+    const seenKey = 'achievements_seen';
+    const seen = JSON.parse(localStorage.getItem(seenKey) || '[]');
+    const newlyUnlocked = (data.achievements || []).find(a => a.is_unlocked && !seen.includes(a.id));
+    if (!newlyUnlocked) return;
+
+    const updatedSeen = [...seen, newlyUnlocked.id];
+    localStorage.setItem(seenKey, JSON.stringify(updatedSeen));
+    setAchievementNotice({
+      id: newlyUnlocked.id,
+      title: newlyUnlocked.title || newlyUnlocked.name || 'Achievement Unlocked',
+      description: newlyUnlocked.description || 'Great job reaching this milestone!',
+      icon: newlyUnlocked.icon || '🏆',
+      coins: Number(newlyUnlocked.coins_reward || newlyUnlocked.reward || 0),
+    });
+    playFanfareSound();
+  }, [data?.achievements]);
+
   useEffect(() => {
     if (!shopNotice) return undefined;
     const timer = setTimeout(() => setShopNotice(null), 3600);
@@ -449,7 +512,7 @@ export default function Dashboard() {
           ? `Saved ¥${numAmount.toLocaleString()}! 🎉`
           : `Deducted ¥${numAmount.toLocaleString()}`,
       );
-
+      if (type === "deposit") playCoinSound();
       }
 
       if (type === "deposit" && data?.activeTarget) {
@@ -548,6 +611,7 @@ export default function Dashboard() {
         target_id: data.activeTarget.id,
         action: action.id,
       });
+      playCareSound();
       showPetReaction({
         emoji: action.icon,
         message: `${data.activeTarget.avatar_name} enjoyed ${action.title.toLowerCase()} time!`,
@@ -763,6 +827,8 @@ export default function Dashboard() {
 
       <GoalCompletionNotice notice={goalCompletionNotice} onClose={() => setGoalCompletionNotice(null)} />
       <GoalMilestoneNotice notice={goalMilestoneNotice} onClose={() => setGoalMilestoneNotice(null)} />
+      <AchievementUnlockNotice achievement={achievementNotice} onClose={() => setAchievementNotice(null)} />
+      <WeeklySummaryNotice summary={weeklySummary} onClose={() => setWeeklySummary(null)} />
 
       <AnimatePresence>
         {shopConfirmItem && (
@@ -944,6 +1010,67 @@ export default function Dashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Daily Saving Reminder Banner */}
+      {(() => {
+        const prefs = JSON.parse(localStorage.getItem('notification_preferences') || '{}');
+        if (prefs.daily_reminder === false) return null;
+        if (savedToday || !target) return null;
+        return (
+          <motion.div
+            className="notification-banner notification-banner-reminder"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <span className="notification-banner-icon">🍲</span>
+            <div>
+              <div className="notification-banner-title">Daily Saving Reminder</div>
+              <div className="notification-banner-desc">
+                {target.avatar_name || 'Your pet'} is waiting! You haven't saved anything today.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="notification-banner-cta"
+              onClick={() => { setShowSaveModal(true); setSaveAmount(''); setTransactionType('deposit'); setTransactionDate(formatDateKey(new Date())); }}
+            >
+              Save Now
+            </button>
+          </motion.div>
+        );
+      })()}
+
+      {/* Streak Alert Banner */}
+      {(() => {
+        const prefs = JSON.parse(localStorage.getItem('notification_preferences') || '{}');
+        if (prefs.streak_alerts === false) return null;
+        if (!target) return null;
+        const streakDays = Number(data?.user?.streak_days || 0);
+        if (streakDays < 2 || savedToday) return null;
+        return (
+          <motion.div
+            className="notification-banner notification-banner-streak"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <span className="notification-banner-icon">🔥</span>
+            <div>
+              <div className="notification-banner-title">Streak Alert — {streakDays} Days!</div>
+              <div className="notification-banner-desc">
+                Don't let your streak break! Save something today to keep the fire alive.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="notification-banner-cta"
+              onClick={() => { playWarningSound(); setShowSaveModal(true); setSaveAmount(''); setTransactionType('deposit'); setTransactionDate(formatDateKey(new Date())); }}
+            >
+              Keep Streak!
+            </button>
+          </motion.div>
+        );
+      })()}
 
       <div className="page-header">
         <div className="page-title home-title-with-profile">
