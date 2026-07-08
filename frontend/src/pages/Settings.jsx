@@ -77,6 +77,7 @@ export default function Settings() {
     localStorage.setItem('notification_preferences', JSON.stringify(next))
   }
   const profileInputRef = useRef(null)
+  const initializedRef = useRef(false)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -84,17 +85,22 @@ export default function Settings() {
   }, [theme])
 
   useEffect(() => {
-    setForm({
-      username: user?.username || '',
-      email: user?.email || '',
-      profile_image: user?.profile_image || '',
-      bio: user?.bio || '',
-    })
-    setPrivacy(prev => ({
-      ...prev,
-      public_profile: Boolean(Number(user?.public_profile ?? 0)),
-      show_on_leaderboard: Boolean(Number(user?.show_on_leaderboard ?? 1)),
-    }))
+    if (user && !initializedRef.current) {
+      setForm({
+        username: user.username || '',
+        email: user.email || '',
+        profile_image: user.profile_image || '',
+        bio: user.bio || '',
+        public_profile: Boolean(Number(user.public_profile ?? 0)),
+        show_on_leaderboard: Boolean(Number(user.show_on_leaderboard ?? 1)),
+      })
+      setPrivacy({
+        public_profile: Boolean(Number(user.public_profile ?? 0)),
+        show_on_leaderboard: Boolean(Number(user.show_on_leaderboard ?? 1)),
+        share_achievements: true,
+      })
+      initializedRef.current = true
+    }
   }, [user])
 
   const handleSave = async () => {
@@ -104,6 +110,7 @@ export default function Settings() {
         ...form,
         bio: form.bio.trim(),
       })
+      initializedRef.current = false
       alert('Settings saved!')
     } catch (err) {
       console.error(err)
