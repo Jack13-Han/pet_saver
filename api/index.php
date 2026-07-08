@@ -305,6 +305,11 @@ if ($path === 'user' && $method === 'PUT') {
         if (strlen($username) < 3) {
             errorResponse('Username min 3 chars');
         }
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
+        $stmt->execute([$username, $userId]);
+        if ($stmt->fetch()) {
+            errorResponse('Username is already taken / အသုံးပြုသူအမည် ရှိနှင့်ပြီးသားဖြစ်ပါသည်');
+        }
         $updates[] = 'username = ?';
         $params[] = $username;
     }
@@ -313,6 +318,11 @@ if ($path === 'user' && $method === 'PUT') {
         $email = trim($input['email'] ?? '');
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             errorResponse('Invalid email');
+        }
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+        $stmt->execute([$email, $userId]);
+        if ($stmt->fetch()) {
+            errorResponse('Email is already registered / အီးမေးလ် ရှိနှင့်ပြီးသားဖြစ်ပါသည်');
         }
         $updates[] = 'email = ?';
         $params[] = $email;
@@ -350,13 +360,11 @@ if ($path === 'user' && $method === 'PUT') {
         $params[] = !empty($input['show_on_leaderboard']) ? 1 : 0;
     }
 
-    if (!$updates) {
-        errorResponse('No updates provided');
+    if ($updates) {
+        $params[] = $userId;
+        $stmt = $pdo->prepare('UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = ?');
+        $stmt->execute($params);
     }
-
-    $params[] = $userId;
-    $stmt = $pdo->prepare('UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = ?');
-    $stmt->execute($params);
 
     $stmt = $pdo->prepare("
         SELECT
