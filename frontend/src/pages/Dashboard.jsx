@@ -37,6 +37,7 @@ import {
 import { useAuth } from "../context/AuthContext.jsx";
 import FinanceCalendar from "../components/FinanceCalendar.jsx";
 import GoalCompletionNotice from "../components/GoalCompletionNotice.jsx";
+import GoalMilestoneNotice from "../components/GoalMilestoneNotice.jsx";
 import { useLanguage } from "../i18n.jsx";
 import { realOCR } from "./ReceiptScanner.jsx";
 import { avatarEmojis, avatarTypes, getPetImageForTarget } from "../petAssets.js";
@@ -177,6 +178,7 @@ export default function Dashboard() {
   const [buyingShopItemId, setBuyingShopItemId] = useState(null);
   const [shopNotice, setShopNotice] = useState(null);
   const [goalCompletionNotice, setGoalCompletionNotice] = useState(null);
+  const [goalMilestoneNotice, setGoalMilestoneNotice] = useState(null);
   const fileInputRef = useRef(null);
   const { user, updateUser } = useAuth();
   const { language } = useLanguage();
@@ -451,6 +453,9 @@ export default function Dashboard() {
       }
 
       if (type === "deposit" && data?.activeTarget) {
+        const oldProgress = Number(data.activeTarget.progress || 0);
+        const newProgress = Number(res.data.progress || 0);
+
         setData((prev) => ({
           ...prev,
           activeTarget: {
@@ -476,8 +481,35 @@ export default function Dashboard() {
               res.data?.coins_earned ?? Math.floor(Number(data.activeTarget.target_amount || 0) / 100),
             );
             updateUser((currentUser) => ({
+              ...currentUser,
               coins: Number(currentUser?.coins || 0) + coinsEarned,
             }));
+          }
+        } else {
+          const milestonePrefs = JSON.parse(localStorage.getItem('notification_preferences') || '{"milestones":true}');
+          if (milestonePrefs.milestones) {
+            const goalId = data.activeTarget.id;
+            const storageKey = `milestones_reached_${goalId}`;
+            const reached = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            
+            let newlyReached = null;
+            if (newProgress >= 75 && oldProgress < 75 && !reached.includes(75)) {
+              newlyReached = 75;
+            } else if (newProgress >= 50 && oldProgress < 50 && !reached.includes(50)) {
+              newlyReached = 50;
+            } else if (newProgress >= 25 && oldProgress < 25 && !reached.includes(25)) {
+              newlyReached = 25;
+            }
+            
+            if (newlyReached) {
+              reached.push(newlyReached);
+              localStorage.setItem(storageKey, JSON.stringify(reached));
+              setGoalMilestoneNotice({
+                goalName: data.activeTarget.name,
+                milestone: newlyReached,
+                avatarName: data.activeTarget.avatar_name,
+              });
+            }
           }
         }
       }
@@ -730,6 +762,7 @@ export default function Dashboard() {
       </AnimatePresence>
 
       <GoalCompletionNotice notice={goalCompletionNotice} onClose={() => setGoalCompletionNotice(null)} />
+      <GoalMilestoneNotice notice={goalMilestoneNotice} onClose={() => setGoalMilestoneNotice(null)} />
 
       <AnimatePresence>
         {shopConfirmItem && (

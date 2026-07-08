@@ -61,6 +61,21 @@ export default function Settings() {
     confirm_password: '',
   })
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
+  const [notifications, setNotifications] = useState(() => {
+    const saved = localStorage.getItem('notification_preferences')
+    return saved ? JSON.parse(saved) : {
+      daily_reminder: true,
+      milestones: true,
+      streak_alerts: true,
+      achievements: true,
+      weekly_summary: false
+    }
+  })
+  const updateNotification = (key, value) => {
+    const next = { ...notifications, [key]: value }
+    setNotifications(next)
+    localStorage.setItem('notification_preferences', JSON.stringify(next))
+  }
   const profileInputRef = useRef(null)
 
   useEffect(() => {
@@ -283,18 +298,21 @@ export default function Settings() {
               <h3 className="settings-panel-title">Notification Preferences</h3>
               <div className="settings-options">
                 {[
-                  { label: 'Daily Saving Reminder', desc: 'Get reminded to save every day', default: true },
-                  { label: 'Goal Milestones', desc: 'Notify when you reach 25%, 50%, 75%', default: true },
-                  { label: 'Streak Alerts', desc: 'Warn when streak is about to break', default: true },
-                  { label: 'Achievement Unlocks', desc: 'Celebrate when you earn badges', default: true },
-                  { label: 'Weekly Summary', desc: 'Weekly report of savings', default: false },
+                  { key: 'daily_reminder', label: 'Daily Saving Reminder', desc: 'Get reminded to save every day' },
+                  { key: 'milestones', label: 'Goal Milestones', desc: 'Notify when you reach 25%, 50%, 75%' },
+                  { key: 'streak_alerts', label: 'Streak Alerts', desc: 'Warn when streak is about to break' },
+                  { key: 'achievements', label: 'Achievement Unlocks', desc: 'Celebrate when you earn badges' },
+                  { key: 'weekly_summary', label: 'Weekly Summary', desc: 'Weekly report of savings' },
                 ].map((item, i) => (
                   <div key={i} className="settings-option">
                     <div className="settings-option-copy">
                       <div className="settings-option-title">{item.label}</div>
                       <div className="settings-option-desc">{item.desc}</div>
                     </div>
-                    <ToggleSwitch defaultChecked={item.default} />
+                    <ToggleSwitch 
+                      checked={notifications[item.key] ?? false} 
+                      onChange={(checked) => updateNotification(item.key, checked)} 
+                    />
                   </div>
                 ))}
               </div>
