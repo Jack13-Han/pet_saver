@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Lottie from 'lottie-react'
 import { Plus, Trash2, Target, Pencil, Lock, X } from 'lucide-react'
 import { shop as shopApi, targets as targetApi } from '../api.js'
+import lePetitChatNoirAnimation from '../assets/lottie/le-petit-chat-noir.json'
 import { avatarTypes } from '../petAssets.js'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -262,10 +264,10 @@ export default function Goals() {
 
       <AnimatePresence>
         {deleteTarget && (
-          <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeleteTarget(null)}>
+          <motion.div className="modal-overlay goals-delete-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeleteTarget(null)}>
             <motion.div className="delete-confirm-modal" initial={{ scale: 0.92, y: 24 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 24 }} onClick={e => e.stopPropagation()}>
               <div className="delete-confirm-gif">
-                <img src="/delete-goal.gif" alt="" onError={e => { e.currentTarget.style.display = 'none' }} />
+                <Lottie animationData={lePetitChatNoirAnimation} loop className="delete-confirm-lottie" />
               </div>
               <div className="delete-confirm-box">
                 <button className="modal-close delete-confirm-close" onClick={() => setDeleteTarget(null)} aria-label="Close">

@@ -32,14 +32,15 @@ import {
   avatars as avatarApi,
   user as userApi,
   targets as targetApi,
-  calendar as calendarApi,
   shop as shopApi,
 } from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import FinanceCalendar from "../components/FinanceCalendar.jsx";
+import GoalCompletionNotice from "../components/GoalCompletionNotice.jsx";
 import { useLanguage } from "../i18n.jsx";
 import { realOCR } from "./ReceiptScanner.jsx";
 import { avatarEmojis, avatarTypes, getPetImageForTarget } from "../petAssets.js";
+import catPlayingAnimation from "../assets/lottie/cat-playing.json";
 import shibaSadAnimation from "../assets/lottie/shiba-sad.json";
 import shoppingAnimation from "../assets/lottie/shopping.json";
 
@@ -62,6 +63,34 @@ const formatDateKey = (date) => {
   const day = String(date.getDate()).padStart(2, "0");
   return `${date.getFullYear()}-${month}-${day}`;
 };
+
+const quickSaveCategories = [
+  "General",
+  "Pet Saving",
+  "Food",
+  "Shopping",
+  "Transport",
+  "Entertainment",
+  "Bills",
+  "Health",
+  "Other",
+];
+
+const formatAmountInput = (value) => {
+  const [integerPart = "", decimalPart] = String(value || "")
+    .replace(/[^\d.]/g, "")
+    .split(".");
+  const normalizedInteger = integerPart.replace(/^0+(?=\d)/, "");
+  const groupedInteger = normalizedInteger.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+  if (decimalPart !== undefined) {
+    return `${groupedInteger || "0"}.${decimalPart.slice(0, 2)}`;
+  }
+
+  return groupedInteger;
+};
+
+const parseAmountInput = (value) => Number(String(value || "").replace(/,/g, ""));
 
 const careActions = [
   { id: "play", icon: "🎾", title: "Play", effect: "+10 Happiness" },
@@ -129,6 +158,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [petReaction, setPetReaction] = useState(null);
+  const [careNotice, setCareNotice] = useState(null);
   const [conversationIndex, setConversationIndex] = useState(0);
   const [caringAction, setCaringAction] = useState(null);
   const [showTutorial, setShowTutorial] = useState(false);
@@ -139,18 +169,46 @@ export default function Dashboard() {
   const [transactionDate, setTransactionDate] = useState(() => formatDateKey(new Date()));
   const [transactionType, setTransactionType] = useState("deposit");
   const [transactionCategory, setTransactionCategory] = useState("General");
+  const [customTransactionCategory, setCustomTransactionCategory] = useState("");
   const [transactionNote, setTransactionNote] = useState("");
   const [isScanning, setIsScanning] = useState(false);
   const [deletingExpiredGoal, setDeletingExpiredGoal] = useState(false);
   const [shopConfirmItem, setShopConfirmItem] = useState(null);
   const [buyingShopItemId, setBuyingShopItemId] = useState(null);
   const [shopNotice, setShopNotice] = useState(null);
+  const [goalCompletionNotice, setGoalCompletionNotice] = useState(null);
   const fileInputRef = useRef(null);
   const { user, updateUser } = useAuth();
   const { language } = useLanguage();
   const navigate = useNavigate();
   const tutorial = tutorialContent[language] || tutorialContent.en;
   const activeTutorialStep = tutorial.steps[tutorialStep];
+
+  const syncCoinBalance = (coinBalance) => {
+    const nextCoins = Number(coinBalance);
+    if (!Number.isFinite(nextCoins)) return false;
+    updateUser({ coins: nextCoins });
+    setData((prev) => ({
+      ...prev,
+      user: {
+        ...prev.user,
+        coins: nextCoins,
+      },
+    }));
+    return true;
+  };
+
+  const setQuickSaveCategory = (category) => {
+    const nextCategory = category || "General";
+    if (quickSaveCategories.includes(nextCategory)) {
+      setTransactionCategory(nextCategory);
+      setCustomTransactionCategory("");
+      return;
+    }
+
+    setTransactionCategory("Custom");
+    setCustomTransactionCategory(nextCategory);
+  };
 
   const openTutorial = () => {
     setTutorialStep(0);
@@ -170,8 +228,8 @@ export default function Dashboard() {
     try {
       showToast("Scanning receipt via AI...", "success");
       const result = await realOCR(file);
-      setSaveAmount(result.total_price.toString());
-      setTransactionCategory(result.category || "Shopping");
+      setSaveAmount(formatAmountInput(result.total_price.toString()));
+      setQuickSaveCategory(result.category || "Shopping");
       setTransactionNote(result.shop_name || "Quick Save");
       setTransactionType("withdrawal"); // Receipts are usually expenses
       showToast(`Scanned! ¥${result.total_price} at ${result.shop_name}`);
@@ -225,6 +283,8 @@ export default function Dashboard() {
     day: "numeric",
     year: "numeric",
   });
+  const canSubmitQuickSave = parseAmountInput(saveAmount) > 0
+    && (transactionCategory !== "Custom" || customTransactionCategory.trim().length > 0);
   const quickSaveOverlayStyle = {
     position: "fixed",
     inset: 0,
@@ -343,24 +403,42 @@ export default function Dashboard() {
     setTimeout(() => setAnimatingPet(false), 1000);
   };
 
+  const showCareNotice = (type, actionTitle = "") => {
+    const isLimit = type === "limit";
+    setCareNotice({
+      type,
+      title: isLimit ? "You've reached your limit today" : "You've shown your pet affection",
+      message: isLimit
+        ? "Your pet has received all 3 care rewards for today. Come back tomorrow for more bonding."
+        : `${data?.activeTarget?.avatar_name || "Your pet"} felt loved from ${actionTitle.toLowerCase()} time.`,
+    });
+  };
+
   const handleTransaction = async (type, transactionAmount = "") => {
     if (!transactionAmount) return false;
-    const numAmount = parseFloat(transactionAmount);
+    const numAmount = parseAmountInput(transactionAmount);
     if (numAmount <= 0) return false;
+    const category = transactionCategory === "Custom"
+      ? customTransactionCategory.trim()
+      : transactionCategory;
+    if (!category) return false;
 
     try {
       const res = await txApi.create({
         target_id: type === "deposit" && data?.activeTarget ? data.activeTarget.id : null,
         amount: numAmount,
         type,
-        category: transactionCategory,
-        note: transactionNote ? `${transactionCategory} · ${transactionNote}` : `${transactionCategory} · ${
+        category,
+        note: transactionNote ? `${category} · ${transactionNote}` : `${category} · ${
           type === "deposit" ? "Daily savings" : "Expense deduction"
         }`,
         date: transactionDate,
       });
 
-      showPetReaction(res.data?.pet_reaction);
+      const completedGoal = type === "deposit" && data?.activeTarget && res.data.status === "completed";
+
+      if (!completedGoal) {
+        showPetReaction(res.data?.pet_reaction);
 
       setAnimatingPet(true);
       setTimeout(() => setAnimatingPet(false), 1000);
@@ -369,6 +447,8 @@ export default function Dashboard() {
           ? `Saved ¥${numAmount.toLocaleString()}! 🎉`
           : `Deducted ¥${numAmount.toLocaleString()}`,
       );
+
+      }
 
       if (type === "deposit" && data?.activeTarget) {
         setData((prev) => ({
@@ -386,11 +466,19 @@ export default function Dashboard() {
         }));
 
         if (res.data.status === "completed") {
-          showToast("🎉 Goal completed! You earned coins!");
-          const currentCoins = user?.coins || parseInt(JSON.parse(localStorage.getItem('user'))?.coins) || 0;
-          updateUser({
-            coins: currentCoins + Math.floor(data.activeTarget.target_amount / 100),
+          setPetReaction(null);
+          setGoalCompletionNotice({
+            goalName: data.activeTarget.name,
+            coinsEarned: Number(res.data?.coins_earned || 0),
           });
+          if (!syncCoinBalance(res.data?.coin_balance)) {
+            const coinsEarned = Number(
+              res.data?.coins_earned ?? Math.floor(Number(data.activeTarget.target_amount || 0) / 100),
+            );
+            updateUser((currentUser) => ({
+              coins: Number(currentUser?.coins || 0) + coinsEarned,
+            }));
+          }
         }
       }
 
@@ -404,10 +492,10 @@ export default function Dashboard() {
 
   const handlePetSavingMission = async () => {
     if (!data?.activeTarget) return;
-    setSaveAmount(String(petSavingAmount));
+    setSaveAmount(formatAmountInput(String(petSavingAmount)));
     setTransactionDate(formatDateKey(new Date()));
     setTransactionType("deposit");
-    setTransactionCategory("Pet Saving");
+    setQuickSaveCategory("Pet Saving");
     setTransactionNote(`Daily mission for ${data.activeTarget.avatar_name || data.activeTarget.name}`);
     setShowSaveModal(true);
   };
@@ -419,7 +507,7 @@ export default function Dashboard() {
     }
     if (!data?.activeTarget || caringAction) return;
     if (careActionsRemaining <= 0) {
-      showToast("Daily care limit reached. Come back tomorrow.", "error");
+      showCareNotice("limit");
       return;
     }
     setCaringAction(action.id);
@@ -436,9 +524,9 @@ export default function Dashboard() {
       });
       const nextRemaining = Number(res.data?.care_actions_remaining ?? 0);
       if (nextRemaining <= 0) {
-        showToast(`${action.title} complete. Daily care limit reached.`);
+        showCareNotice("limit");
       } else {
-        showToast(`${action.title} complete. ${nextRemaining}/3 care rewards left today.`);
+        showCareNotice("affection", action.title);
       }
       setData((prev) => ({
         ...prev,
@@ -453,7 +541,11 @@ export default function Dashboard() {
       }));
       loadDashboard();
     } catch (err) {
-      showToast(err.message || "Care action failed", "error");
+      if ((err.message || "").toLowerCase().includes("limit")) {
+        showCareNotice("limit");
+      } else {
+        showToast(err.message || "Care action failed", "error");
+      }
     } finally {
       setCaringAction(null);
     }
@@ -466,16 +558,22 @@ export default function Dashboard() {
     try {
       const res = await dailyQuestApi.claim(questId);
       const coinsEarned = Number(res.data?.coins || 0);
+      const coinBalance = Number(res.data?.coin_balance);
       setData((prev) => ({
         ...prev,
         dailyQuests: res.data?.quests || prev.dailyQuests,
         user: {
           ...prev.user,
-          coins: Number(prev.user?.coins || 0) + coinsEarned,
+          coins: Number.isFinite(coinBalance)
+            ? coinBalance
+            : Number(prev.user?.coins || 0) + coinsEarned,
         },
       }));
-      updateUser({ coins: Number(user?.coins || 0) + coinsEarned });
-      showPetReaction(res.data?.pet_reaction);
+      if (!syncCoinBalance(coinBalance)) {
+        updateUser((currentUser) => ({
+          coins: Number(currentUser?.coins || 0) + coinsEarned,
+        }));
+      }
       showToast(`Daily quest complete! +${coinsEarned} coins`);
     } catch (err) {
       showToast(err.message || "Failed to claim daily quest", "error");
@@ -505,7 +603,8 @@ export default function Dashboard() {
     setSaveAmount("");
     setTransactionDate(formatDateKey(new Date()));
     setTransactionType("withdrawal");
-    setTransactionCategory("General");
+    setQuickSaveCategory("General");
+    setTransactionNote("");
   };
 
   const submitQuickSave = async (e) => {
@@ -515,6 +614,7 @@ export default function Dashboard() {
       setShowSaveModal(false);
       setSaveAmount("");
       setTransactionNote("");
+      setQuickSaveCategory("General");
     }
   };
 
@@ -557,6 +657,48 @@ export default function Dashboard() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {careNotice && (
+          <motion.div
+            className="care-notice-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setCareNotice(null)}
+          >
+            <motion.div
+              className={`care-notice ${careNotice.type}`}
+              initial={{ opacity: 0, y: 24, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.96 }}
+              transition={{ duration: 0.22 }}
+              onClick={(event) => event.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="care-notice-title"
+            >
+              <button
+                type="button"
+                className="care-notice-close"
+                onClick={() => setCareNotice(null)}
+                aria-label="Close care notification"
+              >
+                <X size={18} />
+              </button>
+              <Lottie animationData={catPlayingAnimation} loop className="care-notice-animation" />
+              <div className="care-notice-copy">
+                <span>{careNotice.type === "limit" ? "Daily care limit" : "Pet affection"}</span>
+                <h3 id="care-notice-title">{careNotice.title}</h3>
+                <p>{careNotice.message}</p>
+              </div>
+              <button type="button" className="care-notice-action" onClick={() => setCareNotice(null)}>
+                Got it
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {shopNotice && (
           <motion.div
             className="shop-notification-backdrop"
@@ -586,6 +728,8 @@ export default function Dashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <GoalCompletionNotice notice={goalCompletionNotice} onClose={() => setGoalCompletionNotice(null)} />
 
       <AnimatePresence>
         {shopConfirmItem && (
@@ -1314,11 +1458,8 @@ export default function Dashboard() {
                           ¥
                         </span>
                         <input
-                          type="number"
-                          min="1"
-                          max="9999999999999.99"
-                          step="0.01"
-                          inputMode="numeric"
+                          type="text"
+                          inputMode="decimal"
                           className="w-full border-0 bg-transparent text-xl font-bold text-slate-900 outline-none placeholder:text-slate-400"
                           style={{
                             width: "100%",
@@ -1330,7 +1471,7 @@ export default function Dashboard() {
                             color: "var(--text-primary)",
                           }}
                           value={saveAmount}
-                          onChange={(e) => setSaveAmount(e.target.value)}
+                          onChange={(e) => setSaveAmount(formatAmountInput(e.target.value))}
                           placeholder="0"
                           autoFocus
                         />
@@ -1348,24 +1489,39 @@ export default function Dashboard() {
                       >
                         Category
                       </label>
-                      <select
-                        className="form-input"
-                        style={{
-                          width: "100%",
-                          borderRadius: 16,
-                          background: "var(--bg-secondary)",
-                        }}
-                        value={transactionCategory}
-                        onChange={(e) => setTransactionCategory(e.target.value)}
-                      >
-                        <option value="General">General</option>
-                        <option value="Pet Saving">Pet Saving</option>
-                        <option value="Food">Food</option>
-                        <option value="Shopping">Shopping</option>
-                        <option value="Transport">Transport</option>
-                        <option value="Entertainment">Entertainment</option>
-                        <option value="Other">Other</option>
-                      </select>
+                      <div className="quick-save-category-panel">
+                        <div className="quick-save-category-grid">
+                          {quickSaveCategories.map((category) => (
+                            <button
+                              key={category}
+                              type="button"
+                              className={`quick-save-category-chip${transactionCategory === category ? " active" : ""}`}
+                              onClick={() => setQuickSaveCategory(category)}
+                            >
+                              {category}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            className={`quick-save-category-chip${transactionCategory === "Custom" ? " active" : ""}`}
+                            onClick={() => {
+                              setTransactionCategory("Custom");
+                              if (!customTransactionCategory) setCustomTransactionCategory("");
+                            }}
+                          >
+                            Custom
+                          </button>
+                        </div>
+                        {transactionCategory === "Custom" && (
+                          <input
+                            className="quick-save-custom-category"
+                            value={customTransactionCategory}
+                            onChange={(event) => setCustomTransactionCategory(event.target.value)}
+                            placeholder="Write your own category"
+                            maxLength={50}
+                          />
+                        )}
+                      </div>
                     </div>
 
                     <input
@@ -1424,7 +1580,7 @@ export default function Dashboard() {
                           fontSize: 15,
                           fontWeight: 700,
                         }}
-                        disabled={!saveAmount}
+                        disabled={!canSubmitQuickSave}
                       >
                         {transactionType === "withdrawal" ? "Use" : "Save"}
                       </button>

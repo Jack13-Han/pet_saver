@@ -1137,7 +1137,11 @@ function translateNodeTree(root, language) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
-      if (!parent || ["SCRIPT", "STYLE", "TEXTAREA"].includes(parent.tagName)) {
+      if (
+        !parent ||
+        ["SCRIPT", "STYLE", "TEXTAREA"].includes(parent.tagName) ||
+        parent.closest("[data-no-translate]")
+      ) {
         return NodeFilter.FILTER_REJECT;
       }
       return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
