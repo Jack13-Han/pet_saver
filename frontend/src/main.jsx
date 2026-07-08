@@ -7,10 +7,8 @@ import { LanguageProvider } from "./i18n.jsx";
 import "./tailwind.css";
 import "./App.css";
 
-const savedTheme = localStorage.getItem("theme");
-if (savedTheme === "dark") {
-  document.documentElement.dataset.theme = "dark";
-}
+const savedTheme = localStorage.getItem("theme") || "light";
+document.documentElement.dataset.theme = savedTheme;
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

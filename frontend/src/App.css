@@ -64,6 +64,110 @@
   --sidebar-text-inactive: #94a3b8;
 }
 
+/* SAKURA THEME */
+:root[data-theme="sakura"] {
+  --bg-primary: #fff0f3;
+  --bg-secondary: #fff5f7;
+  --bg-card: #ffffff;
+  --bg-sidebar: #ffe3e8;
+  --accent-green: #f43f5e;
+  --accent-green-light: #ffe4e6;
+  --accent-green-dark: #e11d48;
+  --accent-orange: #fb7185;
+  --accent-orange-light: #fff1f2;
+  --accent-blue: #fda4af;
+  --accent-blue-light: #ffe4e6;
+  --accent-yellow: #feca57;
+  --accent-yellow-light: #fffae6;
+  --accent-purple: #f472b6;
+  --text-primary: #4c0519;
+  --text-secondary: #881337;
+  --text-muted: #fda4af;
+  --border-color: #ffe4e6;
+  --shadow-sm: 0 1px 2px 0 rgba(225, 29, 72, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(225, 29, 72, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(225, 29, 72, 0.15);
+  --sidebar-text-inactive: #9f1239;
+}
+
+/* COZY LAVENDER THEME */
+:root[data-theme="lavender"] {
+  --bg-primary: #faf8ff;
+  --bg-secondary: #f3efff;
+  --bg-card: #ffffff;
+  --bg-sidebar: #e8e0ff;
+  --accent-green: #8b5cf6;
+  --accent-green-light: #ede9fe;
+  --accent-green-dark: #7c3aed;
+  --accent-orange: #a78bfa;
+  --accent-orange-light: #f5f3ff;
+  --accent-blue: #c4b5fd;
+  --accent-blue-light: #ede9fe;
+  --accent-yellow: #fbbf24;
+  --accent-yellow-light: #fffbeb;
+  --accent-purple: #c084fc;
+  --text-primary: #2e1065;
+  --text-secondary: #4c1d95;
+  --text-muted: #a78bfa;
+  --border-color: #e9e3ff;
+  --shadow-sm: 0 1px 2px 0 rgba(124, 58, 237, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(124, 58, 237, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(124, 58, 237, 0.15);
+  --sidebar-text-inactive: #5b21b6;
+}
+
+/* CYBERPUNK NEON THEME */
+:root[data-theme="cyberpunk"] {
+  --bg-primary: #0a0a16;
+  --bg-secondary: #0d0e22;
+  --bg-card: #151636;
+  --bg-sidebar: #060714;
+  --accent-green: #00ffcc;
+  --accent-green-light: rgba(0, 255, 204, 0.12);
+  --accent-green-dark: #00cca3;
+  --accent-orange: #ff007f;
+  --accent-orange-light: rgba(255, 0, 127, 0.12);
+  --accent-blue: #390099;
+  --accent-blue-light: rgba(57, 0, 153, 0.15);
+  --accent-yellow: #fefe00;
+  --accent-yellow-light: rgba(254, 254, 0, 0.12);
+  --accent-purple: #9d4edd;
+  --text-primary: #f8fafc;
+  --text-secondary: #00ffcc;
+  --text-muted: #7075b3;
+  --border-color: #272963;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 255, 204, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 255, 204, 0.3);
+  --shadow-lg: 0 8px 24px rgba(255, 0, 127, 0.35);
+  --sidebar-text-inactive: #7075b3;
+}
+
+/* RETRO GAMEBOY THEME */
+:root[data-theme="gameboy"] {
+  --bg-primary: #8bac0f;
+  --bg-secondary: #9bbc0f;
+  --bg-card: #8bac0f;
+  --bg-sidebar: #306230;
+  --accent-green: #0f380f;
+  --accent-green-light: #9bbc0f;
+  --accent-green-dark: #306230;
+  --accent-orange: #306230;
+  --accent-orange-light: #8bac0f;
+  --accent-blue: #306230;
+  --accent-blue-light: #8bac0f;
+  --accent-yellow: #0f380f;
+  --accent-yellow-light: #9bbc0f;
+  --accent-purple: #306230;
+  --text-primary: #0f380f;
+  --text-secondary: #306230;
+  --text-muted: #306230;
+  --border-color: #306230;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --sidebar-text-inactive: #8bac0f;
+}
+
 body {
   font-family: "Nunito", sans-serif;
   background-color: var(--bg-primary);

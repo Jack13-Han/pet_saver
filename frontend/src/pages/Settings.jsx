@@ -60,18 +60,13 @@ export default function Settings() {
     new_password: '',
     confirm_password: '',
   })
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark')
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
   const profileInputRef = useRef(null)
 
   useEffect(() => {
-    if (darkMode) {
-      document.documentElement.dataset.theme = 'dark'
-      localStorage.setItem('theme', 'dark')
-    } else {
-      delete document.documentElement.dataset.theme
-      localStorage.setItem('theme', 'light')
-    }
-  }, [darkMode])
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('theme', theme)
+  }, [theme])
 
   useEffect(() => {
     setForm({
@@ -379,12 +374,53 @@ export default function Settings() {
           {activeTab === 'appearance' && (
             <div className="card settings-panel">
               <h3 className="settings-panel-title">Appearance</h3>
-              <div className="settings-option">
+              <div className="settings-option" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 16 }}>
                 <div className="settings-option-copy">
-                  <div className="settings-option-title">Dark Mode</div>
-                  <div className="settings-option-desc">Switch to dark theme</div>
+                  <div className="settings-option-title">Theme Selector / အပြင်အဆင်ရွေးချယ်ရန်</div>
+                  <div className="settings-option-desc">Choose your favorite colors and layout theme</div>
                 </div>
-                <ToggleSwitch checked={darkMode} onChange={setDarkMode} />
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                  gap: 12,
+                  marginTop: 8
+                }}>
+                  {[
+                    { id: 'light', name: 'Sunny (Light)', my: 'နွေဦးကာလ', colors: ['#fff8f0', '#fb923c', '#4ade80'] },
+                    { id: 'dark', name: 'Midnight (Dark)', my: 'သန်းခေါင်ယံ', colors: ['#0f172a', '#1e293b', '#34d399'] },
+                    { id: 'sakura', name: 'Sakura Garden', my: 'ချယ်ရီပန်းခြံ', colors: ['#fff0f3', '#ffe3e8', '#f43f5e'] },
+                    { id: 'lavender', name: 'Lavender Cozy', my: 'Cozy Lavender', colors: ['#faf8ff', '#e8e0ff', '#8b5cf6'] },
+                    { id: 'cyberpunk', name: 'Cyberpunk Neon', my: 'Cyberpunk', colors: ['#0a0a16', '#151636', '#00ffcc'] },
+                    { id: 'gameboy', name: '8-Bit Retro', my: '၈-ဘစ်စတိုင်', colors: ['#8bac0f', '#306230', '#0f380f'] },
+                  ].map(item => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      onClick={() => setTheme(item.id)}
+                      style={{
+                        padding: 12,
+                        borderRadius: 12,
+                        border: theme === item.id ? '2px solid var(--accent-green)' : '1px solid var(--border-color)',
+                        background: theme === item.id ? 'var(--bg-secondary)' : 'var(--bg-card)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 8,
+                        boxShadow: theme === item.id ? 'var(--shadow-md)' : 'none',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {item.colors.map((c, i) => (
+                          <div key={i} style={{ width: 16, height: 16, borderRadius: '50%', background: c, border: '1px solid rgba(0,0,0,0.1)' }} />
+                        ))}
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-primary)' }}>{item.name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{item.my}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="settings-option settings-language-option">
                 <div className="settings-option-copy">
