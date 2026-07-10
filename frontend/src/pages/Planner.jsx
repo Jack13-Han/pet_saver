@@ -50,7 +50,7 @@ export default function Planner() {
     next_run_date: new Date().toISOString().slice(0, 10),
     target_id: '',
   })
-  const { updateUser } = useAuth()
+  const { user, updateUser } = useAuth()
 
   if (user?.isGuest) {
     return (
