@@ -68,7 +68,7 @@ const formatDateKey = (date) => {
   return `${date.getFullYear()}-${month}-${day}`;
 };
 
-const quickSaveCategories = [
+const defaultQuickSaveCategories = [
   "General",
   "Pet Saving",
   "Food",
@@ -175,6 +175,11 @@ export default function Dashboard() {
   const [transactionCategory, setTransactionCategory] = useState("General");
   const [customTransactionCategory, setCustomTransactionCategory] = useState("");
   const [transactionNote, setTransactionNote] = useState("");
+  const [quickSaveCategoryOptions, setQuickSaveCategoryOptions] = useState(defaultQuickSaveCategories);
+  const [categoryEditor, setCategoryEditor] = useState(null);
+  const [categoryDrafts, setCategoryDrafts] = useState({});
+  const [editingCategoryName, setEditingCategoryName] = useState(null);
+  const [savingCategoryChange, setSavingCategoryChange] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [deletingExpiredGoal, setDeletingExpiredGoal] = useState(false);
   const [shopConfirmItem, setShopConfirmItem] = useState(null);
@@ -207,7 +212,7 @@ export default function Dashboard() {
 
   const setQuickSaveCategory = (category) => {
     const nextCategory = category || "General";
-    if (quickSaveCategories.includes(nextCategory)) {
+    if (quickSaveCategoryOptions.includes(nextCategory)) {
       setTransactionCategory(nextCategory);
       setCustomTransactionCategory("");
       return;
@@ -292,6 +297,13 @@ export default function Dashboard() {
   });
   const canSubmitQuickSave = parseAmountInput(saveAmount) > 0
     && (transactionCategory !== "Custom" || customTransactionCategory.trim().length > 0);
+  const selectedQuickSaveCategory = transactionCategory === "Custom"
+    ? customTransactionCategory.trim()
+    : transactionCategory;
+  const editableQuickSaveCategory = selectedQuickSaveCategory || "General";
+  const categoryManagerOptions = quickSaveCategoryOptions.includes(editableQuickSaveCategory)
+    ? quickSaveCategoryOptions
+    : [...quickSaveCategoryOptions, editableQuickSaveCategory].filter(Boolean);
   const quickSaveOverlayStyle = {
     position: "fixed",
     inset: 0,
@@ -389,9 +401,15 @@ export default function Dashboard() {
 
   const loadDashboard = async () => {
     try {
-      const dashboardRes = await dashboardApi.get();
+      const [dashboardRes, categoriesRes] = await Promise.all([
+        dashboardApi.get(),
+        txApi.listCategories().catch(() => ({ data: defaultQuickSaveCategories })),
+      ]);
 
       setData(dashboardRes.data);
+      if (Array.isArray(categoriesRes.data) && categoriesRes.data.length) {
+        setQuickSaveCategoryOptions(categoriesRes.data);
+      }
       setLoading(false);
     } catch (err) {
       showToast("Failed to load dashboard", "error");
@@ -402,6 +420,97 @@ export default function Dashboard() {
   const showToast = (message, type = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const openCategoryEditor = () => {
+    setCategoryEditor({ open: true });
+    setEditingCategoryName(null);
+    setCategoryDrafts(
+      Object.fromEntries(categoryManagerOptions.map((category) => [category, category])),
+    );
+  };
+
+  const applyCategoryOptions = (categories) => {
+    if (Array.isArray(categories) && categories.length) {
+      setQuickSaveCategoryOptions(categories);
+    }
+  };
+
+  const startEditingQuickSaveCategory = (category) => {
+    setEditingCategoryName(category);
+    setCategoryDrafts((previous) => ({
+      ...previous,
+      [category]: previous[category] ?? category,
+    }));
+  };
+
+  const editQuickSaveCategory = async (category) => {
+    const currentCategory = category || "";
+    const nextCategory = String(categoryDrafts[currentCategory] ?? currentCategory).trim();
+    if (!currentCategory || !nextCategory) {
+      showToast("Category name is required", "error");
+      return;
+    }
+    if (nextCategory.length > 50) {
+      showToast("Category name must be 50 characters or less", "error");
+      return;
+    }
+
+    setSavingCategoryChange(true);
+    try {
+      const res = await txApi.renameCategory({
+        old_category: currentCategory,
+        new_category: nextCategory,
+      });
+      const nextCategories = Array.isArray(res.data?.categories) && res.data.categories.length
+        ? res.data.categories
+        : categoryManagerOptions.map((category) => (
+          category === currentCategory ? nextCategory : category
+        ));
+      applyCategoryOptions(nextCategories);
+      if (editableQuickSaveCategory === currentCategory) {
+        setTransactionCategory(nextCategory);
+        setCustomTransactionCategory("");
+      }
+      setEditingCategoryName(null);
+      setCategoryDrafts(Object.fromEntries(nextCategories.map((category) => [category, category])));
+      showToast("Category updated");
+      await loadDashboard();
+    } catch (err) {
+      showToast(err.message || "Failed to update category", "error");
+    } finally {
+      setSavingCategoryChange(false);
+    }
+  };
+
+  const deleteQuickSaveCategory = async (category) => {
+    const currentCategory = category || "";
+    if (!currentCategory) return;
+    if (currentCategory === "General") {
+      showToast("General category cannot be deleted", "error");
+      return;
+    }
+
+    setSavingCategoryChange(true);
+    try {
+      const res = await txApi.deleteCategory(currentCategory);
+      const nextCategories = Array.isArray(res.data?.categories) && res.data.categories.length
+        ? res.data.categories
+        : categoryManagerOptions.filter((category) => category !== currentCategory);
+      applyCategoryOptions(nextCategories);
+      if (editableQuickSaveCategory === currentCategory) {
+        setTransactionCategory("General");
+        setCustomTransactionCategory("");
+      }
+      setEditingCategoryName(null);
+      setCategoryDrafts(Object.fromEntries(nextCategories.map((category) => [category, category])));
+      showToast("Category deleted");
+      await loadDashboard();
+    } catch (err) {
+      showToast(err.message || "Failed to delete category", "error");
+    } finally {
+      setSavingCategoryChange(false);
+    }
   };
 
   const handleShopPreviewClick = (item) => {
@@ -1446,10 +1555,10 @@ export default function Dashboard() {
                   </div>
 
                   <div
-                    className="grid grid-cols-3 gap-2 px-5 pt-5"
+                    className="grid grid-cols-2 gap-2 px-5 pt-5"
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
                       gap: 8,
                       padding: "20px 20px 0",
                     }}
@@ -1509,22 +1618,6 @@ export default function Dashboard() {
                       onClick={() => setTransactionType("withdrawal")}
                     >
                       Expense
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-300"
-                      style={{
-                        borderRadius: 12,
-                        border: "1px solid var(--border-color)",
-                        background: "var(--bg-secondary)",
-                        color: "var(--text-muted)",
-                        padding: "10px 12px",
-                        fontSize: 14,
-                        fontWeight: 700,
-                      }}
-                      disabled
-                    >
-                      Transfer
                     </button>
                   </div>
 
@@ -1639,19 +1732,29 @@ export default function Dashboard() {
                     </div>
 
                     <div className="space-y-2">
-                      <label
-                        className="text-sm font-bold text-slate-500"
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: "#6b7280",
-                        }}
-                      >
-                        Category
-                      </label>
+                      <div className="quick-save-category-header">
+                        <label
+                          className="text-sm font-bold text-slate-500"
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: "#6b7280",
+                          }}
+                        >
+                          Category
+                        </label>
+                        <button
+                          type="button"
+                          className="quick-save-category-edit-button"
+                          onClick={openCategoryEditor}
+                          aria-label={`Edit ${editableQuickSaveCategory} category`}
+                        >
+                          <span aria-hidden="true">{"\u270F\uFE0F"}</span>
+                        </button>
+                      </div>
                       <div className="quick-save-category-panel">
                         <div className="quick-save-category-grid">
-                          {quickSaveCategories.map((category) => (
+                          {quickSaveCategoryOptions.map((category) => (
                             <button
                               key={category}
                               type="button"
@@ -1763,6 +1866,107 @@ export default function Dashboard() {
                     </div>
                   </form>
                 </motion.div>
+                <AnimatePresence>
+                  {categoryEditor && (
+                    <motion.div
+                      className="quick-save-category-editor-backdrop"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setCategoryEditor(null);
+                      }}
+                      onWheel={(event) => {
+                        event.stopPropagation();
+                        if (event.target === event.currentTarget) {
+                          event.preventDefault();
+                        }
+                      }}
+                      onTouchMove={(event) => {
+                        event.stopPropagation();
+                        if (event.target === event.currentTarget) {
+                          event.preventDefault();
+                        }
+                      }}
+                    >
+                      <motion.div
+                        className="quick-save-category-editor"
+                        initial={{ scale: 0.94, y: 12 }}
+                        animate={{ scale: 1, y: 0 }}
+                        exit={{ scale: 0.94, y: 12 }}
+                        onClick={(event) => event.stopPropagation()}
+                        onWheel={(event) => event.stopPropagation()}
+                        onTouchMove={(event) => event.stopPropagation()}
+                      >
+                        <div className="quick-save-category-editor-top">
+                          <div>
+                            <span>Manage categories</span>
+                            <strong>All categories</strong>
+                          </div>
+                          <button
+                            type="button"
+                            className="quick-save-category-editor-close"
+                            onClick={() => setCategoryEditor(null)}
+                            aria-label="Close category editor"
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+                        <div className="quick-save-category-editor-list">
+                          {categoryManagerOptions.map((category) => {
+                            const isEditing = editingCategoryName === category;
+                            return (
+                              <div className="quick-save-category-editor-row" key={category}>
+                                <div className="quick-save-category-editor-name">
+                                  {isEditing ? (
+                                    <input
+                                      className="quick-save-category-editor-input"
+                                      value={categoryDrafts[category] ?? category}
+                                      onChange={(event) => {
+                                        const value = event.target.value;
+                                        setCategoryDrafts((previous) => ({
+                                          ...previous,
+                                          [category]: value,
+                                        }));
+                                      }}
+                                      maxLength={50}
+                                      autoFocus
+                                    />
+                                  ) : (
+                                    <span>{category}</span>
+                                  )}
+                                </div>
+                                <div className="quick-save-category-editor-actions">
+                                  <button
+                                    type="button"
+                                    className="quick-save-category-editor-edit"
+                                    onClick={() => (
+                                      isEditing
+                                        ? editQuickSaveCategory(category)
+                                        : startEditingQuickSaveCategory(category)
+                                    )}
+                                    disabled={savingCategoryChange}
+                                  >
+                                    {isEditing ? "Save" : "Edit"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="quick-save-category-editor-delete"
+                                    onClick={() => deleteQuickSaveCategory(category)}
+                                    disabled={savingCategoryChange || category === "General"}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
           </AnimatePresence>

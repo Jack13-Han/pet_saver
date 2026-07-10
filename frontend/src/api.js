@@ -132,6 +132,9 @@ export const transactions = {
   list: () => api("transactions"),
   create: (data) => api("transactions", { method: "POST", body: data }),
   getInsights: () => api("transactions/insights"),
+  listCategories: () => api("transactions/categories"),
+  renameCategory: (data) => api("transactions/categories", { method: "PUT", body: data }),
+  deleteCategory: (category) => api("transactions/categories", { method: "DELETE", body: { category } }),
 };
 
 //calendar

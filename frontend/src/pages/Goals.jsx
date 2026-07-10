@@ -1,11 +1,23 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Lottie from 'lottie-react'
-import { Plus, Trash2, Target, Pencil, Lock, X } from 'lucide-react'
+import { Check, ChevronDown, Plus, Trash2, Target, Pencil, Lock, X } from 'lucide-react'
 import { shop as shopApi, targets as targetApi } from '../api.js'
 import lePetitChatNoirAnimation from '../assets/lottie/le-petit-chat-noir.json'
 import { avatarTypes } from '../petAssets.js'
 import { useAuth } from '../context/AuthContext.jsx'
+
+const goalCategoryOptions = ['General', 'Education', 'Electronics', 'Travel', 'Emergency']
+
+const defaultGoalForm = {
+  name: '',
+  description: '',
+  target_amount: '',
+  category: 'General',
+  deadline: '',
+  avatar_type: 'dog',
+  avatar_name: 'Mochi'
+}
 
 export default function Goals() {
   const { user } = useAuth()
@@ -48,10 +60,8 @@ export default function Goals() {
   const [loading, setLoading] = useState(true)
   const [avatarShopItems, setAvatarShopItems] = useState([])
   const [customCategory, setCustomCategory] = useState('')
-  const [form, setForm] = useState({
-    name: '', description: '', target_amount: '', category: 'General',
-    deadline: '', avatar_type: 'dog', avatar_name: 'Mochi'
-  })
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false)
+  const [form, setForm] = useState(defaultGoalForm)
 
   useEffect(() => { loadGoals() }, [])
 
@@ -74,26 +84,44 @@ export default function Goals() {
   }
 
   const handleEditClick = (goal) => {
+    const category = goal.category || 'General'
+    const hasPresetCategory = goalCategoryOptions.includes(category)
+    setCustomCategory(hasPresetCategory ? '' : category)
     setForm({
       name: goal.name,
       description: goal.description || '',
       target_amount: goal.target_amount.toString(),
-      category: goal.category || 'General',
+      category: hasPresetCategory ? category : 'Custom',
       deadline: goal.deadline || '',
       avatar_type: goal.avatar_type || 'dog',
       avatar_name: goal.avatar_name || 'Mochi'
     })
     setEditingGoalId(goal.id)
+    setShowCategoryPicker(false)
+    setShowModal(true)
+  }
+
+  const handleCreateClick = () => {
+    setEditingGoalId(null)
+    setCustomCategory('')
+    setShowCategoryPicker(false)
+    setForm(defaultGoalForm)
     setShowModal(true)
   }
 
   const handleCloseModal = () => {
     setShowModal(false)
     setEditingGoalId(null)
-    setForm({
-      name: '', description: '', target_amount: '', category: 'General',
-      deadline: '', avatar_type: 'dog', avatar_name: 'Mochi'
-    })
+    setCustomCategory('')
+    setShowCategoryPicker(false)
+    setForm(defaultGoalForm)
+  }
+
+  const setGoalCategory = (category, options = {}) => {
+    const { closePicker = true } = options
+    setForm(previous => ({ ...previous, category }))
+    if (category !== 'Custom') setCustomCategory('')
+    if (closePicker) setShowCategoryPicker(false)
   }
 
   const handleSave = async (e) => {
@@ -145,6 +173,9 @@ export default function Goals() {
 
   const activeGoals = goals.filter(g => g.status === 'active')
   const completedGoals = goals.filter(g => g.status === 'completed')
+  const selectedGoalCategoryLabel = form.category === 'Custom'
+    ? customCategory.trim() || 'Custom'
+    : form.category
 
   return (
     <div className="animate-fade-in">
@@ -154,7 +185,7 @@ export default function Goals() {
           <p>Set targets and watch your pet grow!</p>
         </div>
         {regularGoals.length === 0 ? (
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+          <button className="btn btn-primary" onClick={handleCreateClick}>
             <Plus size={18} /> New Goal
           </button>
         ) : (
@@ -292,7 +323,7 @@ export default function Goals() {
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-sm p-4 sm:p-0" onClick={handleCloseModal}>
             <motion.div 
-              className="bg-white rounded-[28px] shadow-[0_28px_70px_rgba(15,23,42,0.18)] w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] border border-slate-200"
+              className="relative bg-white rounded-[28px] shadow-[0_28px_70px_rgba(15,23,42,0.18)] w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] border border-slate-200"
               initial={{ opacity: 0, scale: 0.95, y: 20 }} 
               animate={{ opacity: 1, scale: 1, y: 0 }} 
               exit={{ opacity: 0, scale: 0.95, y: 20 }} 
@@ -307,11 +338,16 @@ export default function Goals() {
                   </h3>
                   <p className="text-slate-500 text-sm font-medium">{editingGoalId ? 'Update your target and pet details!' : 'Set a target and watch your pet grow!'}</p>
                 </div>
-                <button 
-                  className="absolute right-6 top-6 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 focus:outline-none" 
-                  onClick={handleCloseModal}
+                <button
+                  type="button"
+                  className="absolute right-6 top-6 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200 focus:outline-none"
+                  onClick={e => {
+                    e.stopPropagation()
+                    handleCloseModal()
+                  }}
+                  aria-label="Close goal editor"
                 >
-                  <Plus className="w-5 h-5 rotate-45" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
               {/* Form Body */}
@@ -349,23 +385,28 @@ export default function Goals() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-bold text-slate-500 block">Category 📁</label>
-                        <select 
-                          className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all outline-none text-slate-900 font-bold appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2310b981%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[position:right_1rem_center] bg-[length:0.8rem_auto]" 
-                          value={form.category} 
-                          onChange={e => setForm({...form, category: e.target.value})}
-                        >
-                          <option>General</option><option>Education</option><option>Electronics</option><option>Travel</option><option>Emergency</option><option>Custom</option>
-                        </select>
-                        {form.category === 'Custom' && (
-                          <input
-                            className="w-full px-4 py-3 mt-2 rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all outline-none text-slate-900 font-bold placeholder:font-normal placeholder:text-slate-400"
-                            value={customCategory}
-                            onChange={e => setCustomCategory(e.target.value)}
-                            placeholder="Enter custom category"
-                            maxLength={50}
-                            required
-                          />
-                        )}
+                        <div className="goal-category-field">
+                          <button
+                            type="button"
+                            className="goal-category-trigger"
+                            onClick={() => setShowCategoryPicker(true)}
+                            aria-haspopup="dialog"
+                            aria-expanded={showCategoryPicker}
+                          >
+                            <span className="goal-category-trigger-value">{selectedGoalCategoryLabel}</span>
+                            <ChevronDown size={18} aria-hidden="true" />
+                          </button>
+                          {form.category === 'Custom' && (
+                            <input
+                              className="quick-save-custom-category goal-category-custom"
+                              value={customCategory}
+                              onChange={e => setCustomCategory(e.target.value)}
+                              placeholder="Write your own category"
+                              maxLength={50}
+                              required
+                            />
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -438,6 +479,87 @@ export default function Goals() {
 
                 </form>
               </div>
+
+              <AnimatePresence>
+                {showCategoryPicker && (
+                  <motion.div
+                    className="goal-category-picker-backdrop"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={() => setShowCategoryPicker(false)}
+                  >
+                    <motion.div
+                      className="goal-category-picker"
+                      role="dialog"
+                      aria-modal="true"
+                      aria-label="Choose goal category"
+                      initial={{ scale: 0.94, y: 12 }}
+                      animate={{ scale: 1, y: 0 }}
+                      exit={{ scale: 0.94, y: 12 }}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <div className="goal-category-picker-top">
+                        <div>
+                          <span>Category</span>
+                          <strong>Choose one</strong>
+                        </div>
+                        <button
+                          type="button"
+                          className="goal-category-picker-close"
+                          onClick={() => setShowCategoryPicker(false)}
+                          aria-label="Close category picker"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                      <div className="goal-category-picker-list">
+                        {goalCategoryOptions.map(category => (
+                          <button
+                            key={category}
+                            type="button"
+                            className={`goal-category-picker-option${form.category === category ? ' active' : ''}`}
+                            onClick={() => setGoalCategory(category)}
+                          >
+                            <span>{category}</span>
+                            {form.category === category && <Check size={16} aria-hidden="true" />}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className={`goal-category-picker-option${form.category === 'Custom' ? ' active' : ''}`}
+                          onClick={() => setGoalCategory('Custom', { closePicker: false })}
+                        >
+                          <span>Custom</span>
+                          {form.category === 'Custom' && <Check size={16} aria-hidden="true" />}
+                        </button>
+                        {form.category === 'Custom' && (
+                          <div className="goal-category-picker-custom">
+                            <input
+                              className="quick-save-custom-category goal-category-custom"
+                              value={customCategory}
+                              onChange={e => setCustomCategory(e.target.value)}
+                              placeholder="Write your own category"
+                              maxLength={50}
+                              autoFocus
+                            />
+                            <button
+                              type="button"
+                              className="goal-category-picker-use"
+                              onClick={() => {
+                                if (customCategory.trim()) setShowCategoryPicker(false)
+                              }}
+                              disabled={!customCategory.trim()}
+                            >
+                              Use Custom
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Footer */}
               <div className="p-6 border-t border-slate-200 bg-slate-50 shrink-0 flex justify-end gap-3 rounded-b-[28px]">

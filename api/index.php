@@ -172,6 +172,156 @@ function ensureUserAchievements($pdo, $userId)
     }
 }
 
+function defaultQuickSaveCategories()
+{
+    return [
+        'General',
+        'Pet Saving',
+        'Food',
+        'Shopping',
+        'Transport',
+        'Entertainment',
+        'Bills',
+        'Health',
+        'Other',
+    ];
+}
+
+function normalizeCategoryName($value, $label = 'Category')
+{
+    $category = trim((string)$value);
+    $length = function_exists('mb_strlen') ? mb_strlen($category) : strlen($category);
+    if ($category === '' || $length > 50) {
+        errorResponse($label . ' must be between 1 and 50 characters');
+    }
+    return $category;
+}
+
+function seedQuickSaveCategories($pdo, $userId)
+{
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM quick_save_categories WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    if ((int)$stmt->fetchColumn() > 0) {
+        return;
+    }
+
+    $insert = $pdo->prepare("INSERT INTO quick_save_categories (user_id, name, sort_order) VALUES (?, ?, ?)");
+    foreach (defaultQuickSaveCategories() as $index => $category) {
+        $insert->execute([$userId, $category, $index * 10]);
+    }
+}
+
+function nextQuickSaveCategorySort($pdo, $userId)
+{
+    $stmt = $pdo->prepare("SELECT COALESCE(MAX(sort_order), 0) + 10 FROM quick_save_categories WHERE user_id = ?");
+    $stmt->execute([$userId]);
+    return (int)$stmt->fetchColumn();
+}
+
+function activateQuickSaveCategory($pdo, $userId, $category, $sortOrder = null)
+{
+    $sortOrder = $sortOrder ?? nextQuickSaveCategorySort($pdo, $userId);
+    $stmt = $pdo->prepare("
+        INSERT INTO quick_save_categories (user_id, name, sort_order, is_deleted)
+        VALUES (?, ?, ?, 0)
+        ON DUPLICATE KEY UPDATE is_deleted = 0, sort_order = VALUES(sort_order), updated_at = CURRENT_TIMESTAMP
+    ");
+    $stmt->execute([$userId, $category, $sortOrder]);
+}
+
+function getQuickSaveCategories($pdo, $userId)
+{
+    seedQuickSaveCategories($pdo, $userId);
+
+    $stmt = $pdo->prepare("SELECT name FROM quick_save_categories WHERE user_id = ? AND is_deleted = 0 ORDER BY sort_order ASC, name ASC");
+    $stmt->execute([$userId]);
+    $categories = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+    $stmt = $pdo->prepare("SELECT name FROM quick_save_categories WHERE user_id = ? AND is_deleted = 1");
+    $stmt->execute([$userId]);
+    $deleted = array_flip($stmt->fetchAll(PDO::FETCH_COLUMN));
+
+    $stmt = $pdo->prepare("
+        SELECT category AS name FROM transactions WHERE user_id = ? AND category IS NOT NULL AND category <> ''
+        UNION
+        SELECT category AS name FROM budgets WHERE user_id = ? AND category IS NOT NULL AND category <> ''
+        UNION
+        SELECT category AS name FROM recurring_entries WHERE user_id = ? AND category IS NOT NULL AND category <> ''
+        UNION
+        SELECT category AS name FROM targets WHERE user_id = ? AND category IS NOT NULL AND category <> ''
+        UNION
+        SELECT category AS name FROM receipts WHERE user_id = ? AND category IS NOT NULL AND category <> ''
+        ORDER BY name ASC
+    ");
+    $stmt->execute([$userId, $userId, $userId, $userId, $userId]);
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $category) {
+        if (!isset($deleted[$category]) && !in_array($category, $categories, true)) {
+            $categories[] = $category;
+        }
+    }
+
+    return $categories ?: defaultQuickSaveCategories();
+}
+
+function updateBudgetCategoryReferences($pdo, $userId, $oldCategory, $newCategory)
+{
+    if ($oldCategory === $newCategory) {
+        return;
+    }
+
+    $stmt = $pdo->prepare("SELECT id, category, monthly_limit FROM budgets WHERE user_id = ? AND category IN (?, ?)");
+    $stmt->execute([$userId, $oldCategory, $newCategory]);
+    $oldBudget = null;
+    $newBudget = null;
+    foreach ($stmt->fetchAll() as $budget) {
+        if ($budget['category'] === $oldCategory) {
+            $oldBudget = $budget;
+        } elseif ($budget['category'] === $newCategory) {
+            $newBudget = $budget;
+        }
+    }
+
+    if ($oldBudget && $newBudget && (int)$oldBudget['id'] !== (int)$newBudget['id']) {
+        $mergedLimit = max((float)$oldBudget['monthly_limit'], (float)$newBudget['monthly_limit']);
+        $pdo->prepare("UPDATE budgets SET monthly_limit = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?")
+            ->execute([$mergedLimit, $newBudget['id'], $userId]);
+        $pdo->prepare("DELETE FROM budgets WHERE id = ? AND user_id = ?")
+            ->execute([$oldBudget['id'], $userId]);
+        return;
+    }
+
+    $pdo->prepare("UPDATE budgets SET category = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND category = ?")
+        ->execute([$newCategory, $userId, $oldCategory]);
+}
+
+function updateStoredCategoryReferences($pdo, $userId, $oldCategory, $newCategory)
+{
+    if ($oldCategory === $newCategory) {
+        return;
+    }
+
+    $delimiter = ' ﾂｷ ';
+    $oldPrefix = $oldCategory . $delimiter;
+    $newPrefix = $newCategory . $delimiter;
+
+    $stmt = $pdo->prepare("
+        UPDATE transactions
+        SET note = CONCAT(?, SUBSTRING(note, CHAR_LENGTH(?) + 1))
+        WHERE user_id = ? AND LEFT(note, CHAR_LENGTH(?)) = ?
+    ");
+    $stmt->execute([$newPrefix, $oldPrefix, $userId, $oldPrefix, $oldPrefix]);
+
+    $pdo->prepare("UPDATE transactions SET category = ? WHERE user_id = ? AND category = ?")
+        ->execute([$newCategory, $userId, $oldCategory]);
+    $pdo->prepare("UPDATE receipts SET category = ? WHERE user_id = ? AND category = ?")
+        ->execute([$newCategory, $userId, $oldCategory]);
+    $pdo->prepare("UPDATE recurring_entries SET category = ? WHERE user_id = ? AND category = ?")
+        ->execute([$newCategory, $userId, $oldCategory]);
+    $pdo->prepare("UPDATE targets SET category = ? WHERE user_id = ? AND category = ?")
+        ->execute([$newCategory, $userId, $oldCategory]);
+    updateBudgetCategoryReferences($pdo, $userId, $oldCategory, $newCategory);
+}
+
 // AUTH
 if ($path === 'auth/register' && $method === 'POST') {
     $username = trim($input['username'] ?? '');
@@ -752,6 +902,61 @@ if (preg_match('/^targets\/(\d+)$/', $path, $m) && $method === 'PUT') {
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         errorResponse('Failed to update target', 500);
+    }
+}
+
+if ($path === 'transactions/categories' && $method === 'GET') {
+    successResponse(getQuickSaveCategories($pdo, $userId));
+}
+
+if ($path === 'transactions/categories' && $method === 'PUT') {
+    $oldCategory = normalizeCategoryName($input['old_category'] ?? '', 'Current category');
+    $newCategory = normalizeCategoryName($input['new_category'] ?? '', 'New category');
+
+    $stmt = $pdo->prepare("SELECT sort_order FROM quick_save_categories WHERE user_id = ? AND name = ? LIMIT 1");
+    $stmt->execute([$userId, $oldCategory]);
+    $sortOrder = $stmt->fetchColumn();
+    if ($sortOrder === false) {
+        $sortOrder = nextQuickSaveCategorySort($pdo, $userId);
+    }
+
+    $pdo->beginTransaction();
+    try {
+        activateQuickSaveCategory($pdo, $userId, $newCategory, (int)$sortOrder);
+        if ($oldCategory !== $newCategory) {
+            if ($oldCategory !== 'General') {
+                $pdo->prepare("UPDATE quick_save_categories SET is_deleted = 1, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND name = ?")
+                    ->execute([$userId, $oldCategory]);
+            }
+            updateStoredCategoryReferences($pdo, $userId, $oldCategory, $newCategory);
+        }
+        $pdo->commit();
+        successResponse(['categories' => getQuickSaveCategories($pdo, $userId)], 'Category updated');
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        errorResponse('Failed to update category', 500);
+    }
+}
+
+if ($path === 'transactions/categories' && $method === 'DELETE') {
+    $category = normalizeCategoryName($input['category'] ?? '', 'Category');
+    if ($category === 'General') {
+        errorResponse('General category cannot be deleted');
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare("
+            INSERT INTO quick_save_categories (user_id, name, sort_order, is_deleted)
+            VALUES (?, ?, ?, 1)
+            ON DUPLICATE KEY UPDATE is_deleted = 1, updated_at = CURRENT_TIMESTAMP
+        ")->execute([$userId, $category, nextQuickSaveCategorySort($pdo, $userId)]);
+        updateStoredCategoryReferences($pdo, $userId, $category, 'General');
+        $pdo->commit();
+        successResponse(['categories' => getQuickSaveCategories($pdo, $userId)], 'Category deleted');
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        errorResponse('Failed to delete category', 500);
     }
 }
 
@@ -1810,6 +2015,19 @@ function ensureFinanceFeatureTables($pdo)
             last_run_date DATE DEFAULT NULL,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS quick_save_categories (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            name VARCHAR(50) NOT NULL,
+            sort_order INT NOT NULL DEFAULT 0,
+            is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_user_quick_save_category (user_id, name)
         )
     ");
 
