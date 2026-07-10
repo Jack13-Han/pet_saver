@@ -1417,12 +1417,20 @@ if ($path === 'missions/claim' && $method === 'POST') {
         ->execute([$userId, $missionId, $reward]);
     $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$reward, $userId]);
     $petReaction = rewardPetForMoneyAction($pdo, $userId, null, 'mission', $reward);
+    $balanceStmt = $pdo->prepare("SELECT coins FROM users WHERE id = ?");
+    $balanceStmt->execute([$userId]);
+    $updatedCoins = (int)$balanceStmt->fetchColumn();
     $pdo->commit();
     $coinStmt = $pdo->prepare("SELECT coins FROM users WHERE id = ?");
     $coinStmt->execute([$userId]);
     $coinBalance = (int)$coinStmt->fetchColumn();
 
-    successResponse(['coins' => $reward, 'coin_balance' => $coinBalance, 'pet_reaction' => $petReaction], 'Mission reward claimed');
+    successResponse([
+        'coins' => $updatedCoins,
+        'coin_balance' => $coinBalance,
+        'reward_coins' => $reward,
+        'pet_reaction' => $petReaction,
+    ], 'Mission reward claimed');
 }
 
 if ($path === 'daily-quests/claim' && $method === 'POST') {

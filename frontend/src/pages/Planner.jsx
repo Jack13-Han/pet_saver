@@ -36,6 +36,7 @@ export default function Planner() {
   const [targets, setTargets] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [claimingMission, setClaimingMission] = useState(null)
   const [petReaction, setPetReaction] = useState(null)
   const [goalCompletionNotice, setGoalCompletionNotice] = useState(null)
   const [budgetForm, setBudgetForm] = useState({ category: 'Food', monthly_limit: '' })
@@ -50,7 +51,7 @@ export default function Planner() {
     next_run_date: new Date().toISOString().slice(0, 10),
     target_id: '',
   })
-  const { updateUser } = useAuth()
+  const { user, updateUser } = useAuth()
 
   if (user?.isGuest) {
     return (
@@ -232,17 +233,46 @@ export default function Planner() {
   }
 
   const claimMission = async (missionId) => {
-    const res = await finance.claimMission(missionId)
-    const coinBalance = Number(res.data?.coin_balance)
-    if (Number.isFinite(coinBalance)) {
-      updateUser({ coins: coinBalance })
-    } else {
-      updateUser((currentUser) => ({
-        coins: Number(currentUser?.coins || 0) + Number(res.data?.coins || 0),
+    if (claimingMission) return
+
+    const mission = (overview?.missions || []).find((item) => item.id === missionId)
+    const rewardCoins = Number(mission?.reward || 0)
+    if (!mission || !mission.completed || mission.claimed) return
+
+    setClaimingMission(missionId)
+    setOverview((current) => current ? {
+      ...current,
+      missions: (current.missions || []).map((item) => (
+        item.id === missionId ? { ...item, claimed: true } : item
+      )),
+    } : current)
+    await updateUser((currentUser) => ({
+      coins: Number(currentUser?.coins || 0) + rewardCoins,
+    }))
+
+    try {
+      const res = await finance.claimMission(missionId)
+      const updatedCoins = Number(res.data?.coin_balance ?? res.data?.coins)
+
+      if (Number.isFinite(updatedCoins)) {
+        await updateUser({ coins: updatedCoins })
+      }
+      setPetReaction(res.data?.pet_reaction || null)
+      await loadPlanner()
+    } catch (err) {
+      setOverview((current) => current ? {
+        ...current,
+        missions: (current.missions || []).map((item) => (
+          item.id === missionId ? { ...item, claimed: false } : item
+        )),
+      } : current)
+      await updateUser((currentUser) => ({
+        coins: Math.max(0, Number(currentUser?.coins || 0) - rewardCoins),
       }))
+      alert(err.message)
+    } finally {
+      setClaimingMission(null)
     }
-    setPetReaction(res.data?.pet_reaction || null)
-    await loadPlanner()
   }
 
   const downloadCsv = async () => {
@@ -292,7 +322,7 @@ export default function Planner() {
         </motion.div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 20 }}>
+      <div className="planner-summary-row">
         <SummaryCard icon={WalletCards} label="This Month Spent" value={money(overview?.month?.spent)} tone="#ef4444" />
         <SummaryCard icon={Target} label="This Month Saved" value={money(overview?.month?.saved)} tone="#10b981" />
         <SummaryCard icon={LineChart} label="Month-End Estimate" value={money(overview?.month?.projected_spending)} tone="#4D96FF" />
@@ -462,8 +492,8 @@ export default function Planner() {
                     <span>{mission.progress}/{mission.target}</span>
                   </div>
                   <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '6px 0 10px' }}>{mission.desc}</p>
-                  <button className="btn btn-primary" style={{ width: '100%' }} disabled={!mission.completed || mission.claimed} onClick={() => claimMission(mission.id)}>
-                    <CheckCircle2 size={16} /> {mission.claimed ? 'Claimed' : `Claim ${mission.reward} coins`}
+                  <button className="btn btn-primary" style={{ width: '100%' }} disabled={!mission.completed || mission.claimed || claimingMission === mission.id} onClick={() => claimMission(mission.id)}>
+                    <CheckCircle2 size={16} /> {mission.claimed ? 'Claimed' : claimingMission === mission.id ? 'Claiming...' : `Claim ${mission.reward} coins`}
                   </button>
                 </div>
               ))}
@@ -478,13 +508,13 @@ export default function Planner() {
 
 function SummaryCard({ icon: Icon, label, value, tone }) {
   return (
-    <motion.div className="card" style={{ ...cardStyle, borderTop: `4px solid ${tone}` }} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 800 }}>{label}</div>
-          <div style={{ fontSize: 24, fontWeight: 950, marginTop: 4 }}>{value}</div>
+    <motion.div className="card planner-summary-card" style={{ ...cardStyle, borderTop: `4px solid ${tone}` }} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+      <div className="planner-summary-content">
+        <div className="planner-summary-copy">
+          <div className="planner-summary-label">{label}</div>
+          <div className="planner-summary-value">{value}</div>
         </div>
-        <Icon size={26} color={tone} />
+        <Icon className="planner-summary-icon" size={26} color={tone} />
       </div>
     </motion.div>
   )
