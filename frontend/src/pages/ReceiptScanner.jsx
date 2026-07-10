@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Upload, ScanLine, Check, X, Sparkles, FileText, Store, DollarSign, Calendar, Tag, Info, Receipt } from 'lucide-react'
 import { receipts as receiptApi, targets as targetApi } from '../api.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
 // Convert the receipt image into the base64 shape expected by the backend scanner.
 const fileToGenerativePart = async (file) => {
@@ -74,8 +75,42 @@ export const realOCR = async (file) => {
 };
 
 export default function ReceiptScanner() {
+  const { user } = useAuth()
   const [image, setImage] = useState(null)
   const [scanning, setScanning] = useState(false)
+
+  if (user?.isGuest) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "48px 24px",
+        textAlign: "center",
+        minHeight: "70vh"
+      }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>🔒</div>
+        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12, color: "var(--text-primary)" }}>
+          Account Required / အကောင့်လိုအပ်ပါသည်
+        </h2>
+        <p style={{ maxWidth: 480, color: "var(--text-secondary)", marginBottom: 24, fontSize: 15, lineHeight: 1.6 }}>
+          This feature (Goals, Pets, Shop, achievements, and statistics) requires a registered account. Sign up or log in to start saving and playing with your pet!
+        </p>
+        <button
+          onClick={() => {
+            localStorage.removeItem("user");
+            window.location.reload();
+          }}
+          className="btn btn-primary"
+          style={{ padding: "12px 28px", fontSize: 15, fontWeight: 700 }}
+        >
+          Sign Up / Login
+        </button>
+      </div>
+    );
+  }
+
   const [result, setResult] = useState(null)
   const [targets, setTargets] = useState([])
   const [receipts, setReceipts] = useState([])
@@ -449,7 +484,7 @@ export default function ReceiptScanner() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex gap-4 pt-2">
+                    <div className="flex flex-col sm:flex-row gap-4 pt-2">
                       <button
                         className="px-6 py-3.5 rounded-2xl font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors flex-1 flex items-center justify-center gap-2"
                         onClick={() => {

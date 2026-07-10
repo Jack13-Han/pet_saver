@@ -25,6 +25,7 @@ import {
 } from 'recharts'
 import { transactions as txApi, finance } from '../api.js'
 import { useLanguage } from '../i18n.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 
 const emptyInsights = {
   categories: [],
@@ -46,9 +47,42 @@ const categoryMeta = {
 const money = (value) => `Yen ${Number(value || 0).toLocaleString()}`
 
 export default function Insights() {
+  const { user } = useAuth()
   const { language } = useLanguage()
   const [data, setData] = useState(emptyInsights)
   const [loading, setLoading] = useState(true)
+
+  if (user?.isGuest) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "48px 24px",
+        textAlign: "center",
+        minHeight: "70vh"
+      }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>🔒</div>
+        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12, color: "var(--text-primary)" }}>
+          Account Required / အကောင့်လိုအပ်ပါသည်
+        </h2>
+        <p style={{ maxWidth: 480, color: "var(--text-secondary)", marginBottom: 24, fontSize: 15, lineHeight: 1.6 }}>
+          This feature (Goals, Pets, Shop, achievements, and statistics) requires a registered account. Sign up or log in to start saving and playing with your pet!
+        </p>
+        <button
+          onClick={() => {
+            localStorage.removeItem("user");
+            window.location.reload();
+          }}
+          className="btn btn-primary"
+          style={{ padding: "12px 28px", fontSize: 15, fontWeight: 700 }}
+        >
+          Sign Up / Login
+        </button>
+      </div>
+    );
+  }
   const [error, setError] = useState(null)
   const [showWeeklyModal, setShowWeeklyModal] = useState(false)
   const [weeklyReportText, setWeeklyReportText] = useState('')

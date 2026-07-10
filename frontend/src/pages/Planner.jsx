@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { budgets as budgetApi, finance, recurring as recurringApi, targets as targetApi, transactions as transactionApi } from '../api.js'
 import { useAuth } from '../context/AuthContext.jsx'
+import GoalCompletionNotice from '../components/GoalCompletionNotice.jsx'
 import { useLanguage } from '../i18n.jsx'
 
 const categories = ['Food', 'Shopping', 'Transport', 'Entertainment', 'Education', 'Emergency', 'General', 'Other']
@@ -36,6 +37,7 @@ export default function Planner() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [petReaction, setPetReaction] = useState(null)
+  const [goalCompletionNotice, setGoalCompletionNotice] = useState(null)
   const [budgetForm, setBudgetForm] = useState({ category: 'Food', monthly_limit: '' })
   const [emergencyForm, setEmergencyForm] = useState({ target_amount: '' })
   const [emergencyDeposit, setEmergencyDeposit] = useState({ amount: '' })
@@ -48,7 +50,39 @@ export default function Planner() {
     next_run_date: new Date().toISOString().slice(0, 10),
     target_id: '',
   })
-  const { user, updateUser } = useAuth()
+  const { updateUser } = useAuth()
+
+  if (user?.isGuest) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "48px 24px",
+        textAlign: "center",
+        minHeight: "70vh"
+      }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>🔒</div>
+        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12, color: "var(--text-primary)" }}>
+          Account Required / အကောင့်လိုအပ်ပါသည်
+        </h2>
+        <p style={{ maxWidth: 480, color: "var(--text-secondary)", marginBottom: 24, fontSize: 15, lineHeight: 1.6 }}>
+          This feature (Goals, Pets, Shop, achievements, and statistics) requires a registered account. Sign up or log in to start saving and playing with your pet!
+        </p>
+        <button
+          onClick={() => {
+            localStorage.removeItem("user");
+            window.location.reload();
+          }}
+          className="btn btn-primary"
+          style={{ padding: "12px 28px", fontSize: 15, fontWeight: 700 }}
+        >
+          Sign Up / Login
+        </button>
+      </div>
+    );
+  }
 
   useEffect(() => {
     loadPlanner()
@@ -144,7 +178,15 @@ export default function Planner() {
         note: 'Emergency fund deposit',
         date: new Date().toISOString().slice(0, 10),
       })
-      setPetReaction(res.data?.pet_reaction || null)
+      if (res.data?.status === 'completed') {
+        setPetReaction(null)
+        setGoalCompletionNotice({
+          goalName: overview.emergency.name,
+          coinsEarned: Number(res.data?.coins_earned || 0),
+        })
+      } else {
+        setPetReaction(res.data?.pet_reaction || null)
+      }
       setEmergencyDeposit({ amount: '' })
       await loadPlanner()
     } catch (err) {
@@ -191,7 +233,14 @@ export default function Planner() {
 
   const claimMission = async (missionId) => {
     const res = await finance.claimMission(missionId)
-    updateUser({ coins: (user?.coins || 0) + (res.data?.coins || 0) })
+    const coinBalance = Number(res.data?.coin_balance)
+    if (Number.isFinite(coinBalance)) {
+      updateUser({ coins: coinBalance })
+    } else {
+      updateUser((currentUser) => ({
+        coins: Number(currentUser?.coins || 0) + Number(res.data?.coins || 0),
+      }))
+    }
     setPetReaction(res.data?.pet_reaction || null)
     await loadPlanner()
   }
@@ -217,6 +266,8 @@ export default function Planner() {
 
   return (
     <div className="animate-fade-in" style={{ paddingBottom: 40 }}>
+      <GoalCompletionNotice notice={goalCompletionNotice} onClose={() => setGoalCompletionNotice(null)} />
+
       <div className="page-header">
         <div className="page-title">
           <h2>Money Planner</h2>

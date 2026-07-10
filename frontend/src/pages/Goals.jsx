@@ -1,11 +1,47 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Lottie from 'lottie-react'
 import { Plus, Trash2, Target, Pencil, Lock, X } from 'lucide-react'
 import { shop as shopApi, targets as targetApi } from '../api.js'
+import lePetitChatNoirAnimation from '../assets/lottie/le-petit-chat-noir.json'
 import { avatarTypes } from '../petAssets.js'
+import { useAuth } from '../context/AuthContext.jsx'
 
 export default function Goals() {
+  const { user } = useAuth()
   const [goals, setGoals] = useState([])
+
+  if (user?.isGuest) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "48px 24px",
+        textAlign: "center",
+        minHeight: "70vh"
+      }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>🔒</div>
+        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12, color: "var(--text-primary)" }}>
+          Account Required / အကောင့်လိုအပ်ပါသည်
+        </h2>
+        <p style={{ maxWidth: 480, color: "var(--text-secondary)", marginBottom: 24, fontSize: 15, lineHeight: 1.6 }}>
+          This feature (Goals, Pets, Shop, achievements, and statistics) requires a registered account. Sign up or log in to start saving and playing with your pet!
+        </p>
+        <button
+          onClick={() => {
+            localStorage.removeItem("user");
+            window.location.reload();
+          }}
+          className="btn btn-primary"
+          style={{ padding: "12px 28px", fontSize: 15, fontWeight: 700 }}
+        >
+          Sign Up / Login
+        </button>
+      </div>
+    );
+  }
   const [showModal, setShowModal] = useState(false)
   const [editingGoalId, setEditingGoalId] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
@@ -228,10 +264,10 @@ export default function Goals() {
 
       <AnimatePresence>
         {deleteTarget && (
-          <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeleteTarget(null)}>
+          <motion.div className="modal-overlay goals-delete-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeleteTarget(null)}>
             <motion.div className="delete-confirm-modal" initial={{ scale: 0.92, y: 24 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 24 }} onClick={e => e.stopPropagation()}>
               <div className="delete-confirm-gif">
-                <img src="/delete-goal.gif" alt="" onError={e => { e.currentTarget.style.display = 'none' }} />
+                <Lottie animationData={lePetitChatNoirAnimation} loop className="delete-confirm-lottie" />
               </div>
               <div className="delete-confirm-box">
                 <button className="modal-close delete-confirm-close" onClick={() => setDeleteTarget(null)} aria-label="Close">
@@ -350,7 +386,7 @@ export default function Goals() {
                   <div className="space-y-5">
                     <div className="space-y-3">
                       <label className="text-sm font-bold text-slate-500 block">Choose Your Companion 🐾</label>
-                      <div className="grid grid-cols-5 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                         {avatarTypes.map(type => {
                           const unlocked = isAvatarUnlocked(type)
                           const shopItem = avatarShopMap[type.id]

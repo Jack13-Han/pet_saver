@@ -305,6 +305,11 @@ if ($path === 'user' && $method === 'PUT') {
         if (strlen($username) < 3) {
             errorResponse('Username min 3 chars');
         }
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
+        $stmt->execute([$username, $userId]);
+        if ($stmt->fetch()) {
+            errorResponse('Username is already taken / အသုံးပြုသူအမည် ရှိနှင့်ပြီးသားဖြစ်ပါသည်');
+        }
         $updates[] = 'username = ?';
         $params[] = $username;
     }
@@ -313,6 +318,11 @@ if ($path === 'user' && $method === 'PUT') {
         $email = trim($input['email'] ?? '');
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             errorResponse('Invalid email');
+        }
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ? AND id != ?");
+        $stmt->execute([$email, $userId]);
+        if ($stmt->fetch()) {
+            errorResponse('Email is already registered / အီးမေးလ် ရှိနှင့်ပြီးသားဖြစ်ပါသည်');
         }
         $updates[] = 'email = ?';
         $params[] = $email;
@@ -350,13 +360,11 @@ if ($path === 'user' && $method === 'PUT') {
         $params[] = !empty($input['show_on_leaderboard']) ? 1 : 0;
     }
 
-    if (!$updates) {
-        errorResponse('No updates provided');
+    if ($updates) {
+        $params[] = $userId;
+        $stmt = $pdo->prepare('UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = ?');
+        $stmt->execute($params);
     }
-
-    $params[] = $userId;
-    $stmt = $pdo->prepare('UPDATE users SET ' . implode(', ', $updates) . ' WHERE id = ?');
-    $stmt->execute($params);
 
     $stmt = $pdo->prepare("
         SELECT
@@ -778,6 +786,7 @@ if ($path === 'transactions' && $method === 'POST') {
     }
 
     $petReaction = null;
+    $coinsEarned = 0;
     $pdo->beginTransaction();
     try {
         $pdo->prepare("INSERT INTO transactions (target_id, user_id, amount, type, category, note, transaction_date) VALUES (?, ?, ?, ?, ?, ?, ?)")
@@ -848,12 +857,17 @@ if ($path === 'transactions' && $method === 'POST') {
 
         checkAchievements($pdo, $userId);
         $pdo->commit();
+        $coinStmt = $pdo->prepare("SELECT coins FROM users WHERE id = ?");
+        $coinStmt->execute([$userId]);
+        $coinBalance = (int)$coinStmt->fetchColumn();
         successResponse([
             'new_amount' => $newAmount,
             'progress' => round($displayProgress, 1),
             'actual_progress' => round($progress, 1),
             'status' => $status,
             'mood' => $mood,
+            'coins_earned' => $coinsEarned,
+            'coin_balance' => $coinBalance,
             'pet_reaction' => $petReaction,
         ], 'Transaction recorded');
     } catch (Throwable $e) {
@@ -1404,8 +1418,11 @@ if ($path === 'missions/claim' && $method === 'POST') {
     $pdo->prepare("UPDATE users SET coins = coins + ? WHERE id = ?")->execute([$reward, $userId]);
     $petReaction = rewardPetForMoneyAction($pdo, $userId, null, 'mission', $reward);
     $pdo->commit();
+    $coinStmt = $pdo->prepare("SELECT coins FROM users WHERE id = ?");
+    $coinStmt->execute([$userId]);
+    $coinBalance = (int)$coinStmt->fetchColumn();
 
-    successResponse(['coins' => $reward, 'pet_reaction' => $petReaction], 'Mission reward claimed');
+    successResponse(['coins' => $reward, 'coin_balance' => $coinBalance, 'pet_reaction' => $petReaction], 'Mission reward claimed');
 }
 
 if ($path === 'daily-quests/claim' && $method === 'POST') {
@@ -1434,9 +1451,13 @@ if ($path === 'daily-quests/claim' && $method === 'POST') {
             ->execute([$reward, $userId]);
         $petReaction = rewardPetForMoneyAction($pdo, $userId, null, 'quest', $reward);
         $pdo->commit();
+        $coinStmt = $pdo->prepare("SELECT coins FROM users WHERE id = ?");
+        $coinStmt->execute([$userId]);
+        $coinBalance = (int)$coinStmt->fetchColumn();
 
         successResponse([
             'coins' => $reward,
+            'coin_balance' => $coinBalance,
             'pet_reaction' => $petReaction,
             'quests' => getDailyMoneyQuests($pdo, $userId),
         ], 'Daily quest reward claimed');

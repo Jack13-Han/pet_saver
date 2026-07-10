@@ -7,6 +7,39 @@ import { useLanguage } from '../i18n.jsx'
 
 export default function Settings() {
   const { user, logout, updateUser } = useAuth()
+
+  if (user?.isGuest) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "48px 24px",
+        textAlign: "center",
+        minHeight: "70vh"
+      }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>🔒</div>
+        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12, color: "var(--text-primary)" }}>
+          Account Required / အကောင့်လိုအပ်ပါသည်
+        </h2>
+        <p style={{ maxWidth: 480, color: "var(--text-secondary)", marginBottom: 24, fontSize: 15, lineHeight: 1.6 }}>
+          This feature (Goals, Pets, Shop, achievements, and statistics) requires a registered account. Sign up or log in to start saving and playing with your pet!
+        </p>
+        <button
+          onClick={() => {
+            localStorage.removeItem("user");
+            window.location.reload();
+          }}
+          className="btn btn-primary"
+          style={{ padding: "12px 28px", fontSize: 15, fontWeight: 700 }}
+        >
+          Sign Up / Login
+        </button>
+      </div>
+    );
+  }
+
   const { language, setLanguage, languages } = useLanguage()
   const [activeTab, setActiveTab] = useState('profile')
   const [form, setForm] = useState({
@@ -27,31 +60,48 @@ export default function Settings() {
     new_password: '',
     confirm_password: '',
   })
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark')
-  const profileInputRef = useRef(null)
-
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.dataset.theme = 'dark'
-      localStorage.setItem('theme', 'dark')
-    } else {
-      delete document.documentElement.dataset.theme
-      localStorage.setItem('theme', 'light')
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light')
+  const [notifications, setNotifications] = useState(() => {
+    const saved = localStorage.getItem('notification_preferences')
+    return saved ? JSON.parse(saved) : {
+      daily_reminder: true,
+      milestones: true,
+      streak_alerts: true,
+      achievements: true,
+      weekly_summary: false,
+      sound_effects: true
     }
-  }, [darkMode])
+  })
+  const updateNotification = (key, value) => {
+    const next = { ...notifications, [key]: value }
+    setNotifications(next)
+    localStorage.setItem('notification_preferences', JSON.stringify(next))
+  }
+  const profileInputRef = useRef(null)
+  const initializedRef = useRef(false)
 
   useEffect(() => {
-    setForm({
-      username: user?.username || '',
-      email: user?.email || '',
-      profile_image: user?.profile_image || '',
-      bio: user?.bio || '',
-    })
-    setPrivacy(prev => ({
-      ...prev,
-      public_profile: Boolean(Number(user?.public_profile ?? 0)),
-      show_on_leaderboard: Boolean(Number(user?.show_on_leaderboard ?? 1)),
-    }))
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  useEffect(() => {
+    if (user && !initializedRef.current) {
+      setForm({
+        username: user.username || '',
+        email: user.email || '',
+        profile_image: user.profile_image || '',
+        bio: user.bio || '',
+        public_profile: Boolean(Number(user.public_profile ?? 0)),
+        show_on_leaderboard: Boolean(Number(user.show_on_leaderboard ?? 1)),
+      })
+      setPrivacy({
+        public_profile: Boolean(Number(user.public_profile ?? 0)),
+        show_on_leaderboard: Boolean(Number(user.show_on_leaderboard ?? 1)),
+        share_achievements: true,
+      })
+      initializedRef.current = true
+    }
   }, [user])
 
   const handleSave = async () => {
@@ -61,6 +111,7 @@ export default function Settings() {
         ...form,
         bio: form.bio.trim(),
       })
+      initializedRef.current = false
       alert('Settings saved!')
     } catch (err) {
       console.error(err)
@@ -164,9 +215,6 @@ export default function Settings() {
               </button>
             ))}
           </div>
-          <button onClick={logout} className="settings-logout">
-            <LogOut size={18} /><span>Logout</span>
-          </button>
         </nav>
 
         <motion.div className="settings-content" key={activeTab} initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.2 }}>
@@ -246,6 +294,9 @@ export default function Settings() {
                 <button className="btn btn-primary settings-save" onClick={handleSave} disabled={saving}>
                   <Save size={18} /> {saving ? 'Saving...' : 'Save Changes'}
                 </button>
+                <button type="button" onClick={logout} className="settings-logout settings-logout-mobile">
+                  <LogOut size={18} /><span>Logout</span>
+                </button>
               </div>
             </div>
           )}
@@ -255,18 +306,22 @@ export default function Settings() {
               <h3 className="settings-panel-title">Notification Preferences</h3>
               <div className="settings-options">
                 {[
-                  { label: 'Daily Saving Reminder', desc: 'Get reminded to save every day', default: true },
-                  { label: 'Goal Milestones', desc: 'Notify when you reach 25%, 50%, 75%', default: true },
-                  { label: 'Streak Alerts', desc: 'Warn when streak is about to break', default: true },
-                  { label: 'Achievement Unlocks', desc: 'Celebrate when you earn badges', default: true },
-                  { label: 'Weekly Summary', desc: 'Weekly report of savings', default: false },
+                  { key: 'daily_reminder', label: 'Daily Saving Reminder', desc: 'Get reminded to save every day' },
+                  { key: 'milestones', label: 'Goal Milestones', desc: 'Notify when you reach 25%, 50%, 75%' },
+                  { key: 'streak_alerts', label: 'Streak Alerts', desc: 'Warn when streak is about to break' },
+                  { key: 'achievements', label: 'Achievement Unlocks', desc: 'Celebrate when you earn badges' },
+                  { key: 'weekly_summary', label: 'Weekly Summary', desc: 'Weekly report of savings' },
+                  { key: 'sound_effects', label: 'Sound Effects 🎵', desc: 'Play arcade sounds on saving and level ups' },
                 ].map((item, i) => (
                   <div key={i} className="settings-option">
                     <div className="settings-option-copy">
                       <div className="settings-option-title">{item.label}</div>
                       <div className="settings-option-desc">{item.desc}</div>
                     </div>
-                    <ToggleSwitch defaultChecked={item.default} />
+                    <ToggleSwitch 
+                      checked={notifications[item.key] ?? false} 
+                      onChange={(checked) => updateNotification(item.key, checked)} 
+                    />
                   </div>
                 ))}
               </div>
@@ -346,12 +401,52 @@ export default function Settings() {
           {activeTab === 'appearance' && (
             <div className="card settings-panel">
               <h3 className="settings-panel-title">Appearance</h3>
-              <div className="settings-option">
+              <div className="settings-option" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 16 }}>
                 <div className="settings-option-copy">
-                  <div className="settings-option-title">Dark Mode</div>
-                  <div className="settings-option-desc">Switch to dark theme</div>
+                  <div className="settings-option-title">Theme Selector</div>
+                  <div className="settings-option-desc">Choose your favorite colors and layout theme</div>
                 </div>
-                <ToggleSwitch checked={darkMode} onChange={setDarkMode} />
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                  gap: 12,
+                  marginTop: 8
+                }}>
+                  {[
+                    { id: 'light', name: 'Sunny (Light)', colors: ['#fff8f0', '#fb923c', '#4ade80'] },
+                    { id: 'dark', name: 'Midnight (Dark)', colors: ['#0f172a', '#1e293b', '#34d399'] },
+                    { id: 'sakura', name: 'Sakura Garden', colors: ['#fff0f3', '#ffe3e8', '#f43f5e'] },
+                    { id: 'lavender', name: 'Lavender Cozy', colors: ['#faf8ff', '#e8e0ff', '#8b5cf6'] },
+                    { id: 'cyberpunk', name: 'Cyberpunk Neon', colors: ['#0a0a14', '#18182e', '#ff007f'] },
+                    { id: 'gameboy', name: '8-Bit Retro', colors: ['#cad4b8', '#b3c09f', '#306230'] },
+                  ].map(item => (
+                    <button
+                      type="button"
+                      key={item.id}
+                      onClick={() => setTheme(item.id)}
+                      style={{
+                        padding: 12,
+                        borderRadius: 12,
+                        border: theme === item.id ? '2px solid var(--accent-green)' : '1px solid var(--border-color)',
+                        background: theme === item.id ? 'var(--bg-secondary)' : 'var(--bg-card)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 8,
+                        boxShadow: theme === item.id ? 'var(--shadow-md)' : 'none',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {item.colors.map((c, i) => (
+                          <div key={i} style={{ width: 16, height: 16, borderRadius: '50%', background: c, border: '1px solid rgba(0,0,0,0.1)' }} />
+                        ))}
+                      </div>
+                      <span style={{ fontSize: 13, fontWeight: 'bold', color: 'var(--text-primary)' }}>{item.name}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="settings-option settings-language-option">
                 <div className="settings-option-copy">

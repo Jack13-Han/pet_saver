@@ -19,6 +19,38 @@ export default function Shop() {
   const [sellConfirmItem, setSellConfirmItem] = useState(null)
   const { user, updateUser } = useAuth()
 
+  if (user?.isGuest) {
+    return (
+      <div style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "48px 24px",
+        textAlign: "center",
+        minHeight: "70vh"
+      }}>
+        <div style={{ fontSize: 64, marginBottom: 16 }}>🔒</div>
+        <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12, color: "var(--text-primary)" }}>
+          Account Required / အကောင့်လိုအပ်ပါသည်
+        </h2>
+        <p style={{ maxWidth: 480, color: "var(--text-secondary)", marginBottom: 24, fontSize: 15, lineHeight: 1.6 }}>
+          This feature (Goals, Pets, Shop, achievements, and statistics) requires a registered account. Sign up or log in to start saving and playing with your pet!
+        </p>
+        <button
+          onClick={() => {
+            localStorage.removeItem("user");
+            window.location.reload();
+          }}
+          className="btn btn-primary"
+          style={{ padding: "12px 28px", fontSize: 15, fontWeight: 700 }}
+        >
+          Sign Up / Login
+        </button>
+      </div>
+    );
+  }
+
   useEffect(() => { loadData() }, [])
   useEffect(() => {
     if (!notice) return undefined
@@ -149,55 +181,6 @@ export default function Shop() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {confirmItem && (
-          <motion.div
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setConfirmItem(null)}
-          >
-            <motion.div
-              className="delete-confirm-modal"
-              initial={{ scale: 0.92, y: 24 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.92, y: 24 }}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="delete-confirm-box">
-                <button className="modal-close delete-confirm-close" onClick={() => setConfirmItem(null)} aria-label="Close">
-                  <X size={18} />
-                </button>
-                <div style={{ fontSize: 46, marginBottom: 8 }}>{getItemIcon(confirmItem)}</div>
-                <h3>Buy this item?</h3>
-                <p>
-                  {confirmItem.name} costs {Number(confirmItem.price || 0).toLocaleString()} coins.
-                </p>
-                <div className="delete-confirm-actions">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => setConfirmItem(null)}
-                    disabled={purchasing === confirmItem.id}
-                  >
-                    No
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={confirmPurchase}
-                    disabled={purchasing === confirmItem.id}
-                  >
-                    {purchasing === confirmItem.id ? 'Buying...' : 'Yes'}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
         {sellConfirmItem && (
           <motion.div
             className="modal-overlay"
@@ -279,7 +262,7 @@ export default function Shop() {
               </button>
               {!item.owned && (
                 <button className="btn btn-primary" style={{ marginTop: 12, padding: '8px 16px', fontSize: 13, width: '100%' }}
-                  onClick={() => setConfirmItem(item)}
+                  onClick={() => handleBuy(item)}
                   disabled={purchasing === item.id || user?.coins < item.price}>
                   {purchasing === item.id ? 'Buying...' : user?.coins < item.price ? <><Lock size={14} /> Need coins</> : 'Buy'}
                 </button>
@@ -385,7 +368,7 @@ export default function Shop() {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={() => handleBuy(confirmItem)}
+                  onClick={confirmPurchase}
                   disabled={purchasing !== null}
                 >
                   {purchasing === confirmItem.id ? 'Buying...' : 'Confirm Purchase'}

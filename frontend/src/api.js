@@ -1,10 +1,16 @@
 const API_URL = import.meta.env.VITE_API_URL || "/api/index.php";
+export const USER_SYNC_EVENT = "pet-saver:user-sync";
 
 class ApiError extends Error {
   constructor(message, status) {
     super(message);
     this.status = status;
   }
+}
+
+function emitUserSync(patch) {
+  if (!patch || typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(USER_SYNC_EVENT, { detail: patch }));
 }
 
 async function api(endpoint, options = {}) {
@@ -23,6 +29,7 @@ async function api(endpoint, options = {}) {
 
   const config = {
     method: options.method || "GET",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -51,6 +58,15 @@ async function api(endpoint, options = {}) {
         data?.error || data?.raw || `HTTP ${response.status}`,
         response.status,
       );
+    }
+    const responseData = data?.data;
+    if (responseData && typeof responseData === "object") {
+      if (Object.prototype.hasOwnProperty.call(responseData, "coin_balance")) {
+        const coinBalance = Number(responseData.coin_balance);
+        if (Number.isFinite(coinBalance)) emitUserSync({ coins: coinBalance });
+      } else if (route === "user") {
+        emitUserSync(responseData);
+      }
     }
     return data;
   } catch (err) {

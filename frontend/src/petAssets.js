@@ -38,9 +38,6 @@ const getPetImageState = (target) => {
 export const getPetImage = (avatarType = "cat", state = "idle") => {
   const type = String(avatarType || "cat").toLowerCase();
   const imageState = String(state || "idle").toLowerCase();
-  const emojiOnlyTypes = ["bird", "lion", "giraffe", "panda", "fox"];
-
-  if (emojiOnlyTypes.includes(type)) return null;
 
   return (
     petImages[`${type}_${imageState}`] ||
