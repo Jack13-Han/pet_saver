@@ -137,7 +137,7 @@ export default function WeeklySummaryNotice({ summary, onClose }) {
             </div>
 
             <button type="button" className="goal-completion-action" onClick={onClose}>
-              Let's Crush Next Week! / ကောင်းကောင်းကြိုးစားမည်! 💪
+              Let's Crush Next Week! 💪
             </button>
           </motion.div>
         </motion.div>

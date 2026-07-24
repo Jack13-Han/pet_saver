@@ -87,7 +87,7 @@ export default function AchievementUnlockNotice({ achievement, onClose }) {
             </div>
 
             <button type="button" className="goal-completion-action" onClick={onClose}>
-              Awesome! / ကောင်းတယ်! 🎉
+              Awesome! 🎉
             </button>
           </motion.div>
         </motion.div>

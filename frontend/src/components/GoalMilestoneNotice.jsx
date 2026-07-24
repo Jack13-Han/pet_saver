@@ -46,7 +46,7 @@ export default function GoalMilestoneNotice({ notice, onClose }) {
               </p>
             </div>
             <button type="button" className="goal-completion-action" onClick={onClose}>
-              Keep Saving / ဆက်လက်စုဆောင်းမယ်
+              Keep Saving
             </button>
           </motion.div>
         </motion.div>
