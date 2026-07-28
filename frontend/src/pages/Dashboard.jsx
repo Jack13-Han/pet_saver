@@ -514,10 +514,6 @@ export default function Dashboard() {
   };
 
   const handleShopPreviewClick = (item) => {
-    if (user?.isGuest) {
-      showToast("Guest Mode တွင် ဤလုပ်ဆောင်ချက်ကို အသုံးပြုရန် အကောင့်လိုအပ်ပါသည် (Account required)", "error");
-      return;
-    }
     if (item.owned) {
       showToast("You already own this item.");
       return;
@@ -705,10 +701,6 @@ export default function Dashboard() {
   };
 
   const handleCare = async (action) => {
-    if (user?.isGuest) {
-      showToast("Guest Mode တွင် ဤလုပ်ဆောင်ချက်ကို အသုံးပြုရန် အကောင့်လိုအပ်ပါသည် (Account required)", "error");
-      return;
-    }
     if (!data?.activeTarget || caringAction) return;
     if (careActionsRemaining <= 0) {
       showCareNotice("limit");
@@ -756,10 +748,6 @@ export default function Dashboard() {
     }
   };
   const handleClaimDailyQuest = async (questId) => {
-    if (user?.isGuest) {
-      showToast("Guest Mode တွင် ဤလုပ်ဆောင်ချက်ကို အသုံးပြုရန် အကောင့်လိုအပ်ပါသည် (Account required)", "error");
-      return;
-    }
     try {
       const res = await dailyQuestApi.claim(questId);
       const coinsEarned = Number(res.data?.coins || 0);
@@ -800,10 +788,6 @@ export default function Dashboard() {
   };
 
   const handleQuickSave = async () => {
-    if (user?.isGuest) {
-      showToast("Guest Mode တွင် ဤလုပ်ဆောင်ချက်ကို အသုံးပြုရန် အကောင့်လိုအပ်ပါသည် (Account required)", "error");
-      return;
-    }
     setShowSaveModal(true);
     setSaveAmount("");
     setTransactionDate(formatDateKey(new Date()));
@@ -824,10 +808,6 @@ export default function Dashboard() {
   };
 
   const changeGoal = async (goalId) => {
-    if (user?.isGuest) {
-      showToast("Guest Mode တွင် ဤလုပ်ဆောင်ချက်ကို အသုံးပြုရန် အကောင့်လိုအပ်ပါသည် (Account required)", "error");
-      return;
-    }
     try {
       await userApi.setActiveTarget(goalId);
 

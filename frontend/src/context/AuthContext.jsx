@@ -174,18 +174,35 @@ export function AuthProvider({ children }) {
     return nextUser || { ...user, ...payload, ...responseData };
   };
 
-  const loginAsGuest = () => {
-    const guestUser = {
-      isGuest: true,
-      username: "Guest User",
-      email: "guest@pet-saver.local",
-      coins: 0,
-      level: 1,
-      profile_image: "",
-      bio: "Trying Pet Saver as a guest!"
-    };
-    setUser(guestUser);
-    localStorage.setItem("user", JSON.stringify(guestUser));
+  const loginAsGuest = async () => {
+    setLoading(true);
+    try {
+      const randomId = Math.floor(100000 + Math.random() * 900000);
+      const username = `guest_${randomId}`;
+      const email = `guest_${randomId}@pet-saver.local`;
+      const password = `GuestPass_${randomId}!`;
+
+      const res = await authApi.register(username, email, password);
+      const responseData = res.data || res;
+      const token = responseData.token;
+      const userData = responseData.user || responseData;
+
+      if (token) {
+        localStorage.setItem("token", token);
+        const guestUser = {
+          ...userData,
+          isGuest: true,
+          username: "Guest User",
+          bio: "Trying Pet Saver as a guest!"
+        };
+        setUser(guestUser);
+        localStorage.setItem("user", JSON.stringify(guestUser));
+      }
+    } catch (err) {
+      console.error("Failed to initialize guest session", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
